@@ -1,0 +1,15 @@
+{
+  "name": "Send 1st followup in e-degree",
+  "enabled": false,
+  "description": "Send 1st followup for 1 contact in the e-degree campaign every 10 minutes",
+  "schedule": {
+    "kind": "every",
+    "everyMs": 600000
+  },
+  "workspace": "/home/ubuntu/.openclaw/workspace-outreach-data",
+  "resultFile": "/tmp/claude-code-result-outreach-data.md",
+  "discord": {
+    "channelId": "1491111325173022933",
+    "notify": true
+  }
+}

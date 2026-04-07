@@ -4,6 +4,7 @@ import { formatError } from "./discord.js";
 import { handleGeneral } from "./handlers/general.js";
 import { handleInsightsUI } from "./handlers/insights-ui.js";
 import { handleOutreachData } from "./handlers/outreach-data.js";
+import { startJobScheduler } from "./jobs/jobs.js";
 
 let activeJobs = 0;
 
@@ -13,6 +14,7 @@ const client = new Client({
 
 client.on("ready", () => {
   console.log(`Logged in as ${client.user?.tag ?? "unknown"}`);
+  void startJobScheduler(client);
 });
 
 client.on("messageCreate", async (message: Message) => {

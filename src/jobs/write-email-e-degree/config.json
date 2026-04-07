@@ -1,0 +1,15 @@
+{
+  "name": "Write email in e-degree",
+  "enabled": false,
+  "description": "Compose email content (Subject and Body) for 5 contacts in the e-degree campaign",
+  "schedule": {
+    "kind": "every",
+    "everyMs": 600000
+  },
+  "workspace": "/home/ubuntu/.openclaw/workspace-outreach-data",
+  "resultFile": "/tmp/claude-code-result-outreach-data.md",
+  "discord": {
+    "channelId": "1491111325173022933",
+    "notify": true
+  }
+}
