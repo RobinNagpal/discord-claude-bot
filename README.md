@@ -14,6 +14,7 @@ The bot also includes a job scheduler that runs recurring tasks (e.g. sending ou
 |---|---|---|
 | `1491102767224324309` | **Insights-UI** | Two-step git worktree workflow for the KoalaGains (insights-ui) project in the DoDAO monorepo. Manages worktrees, delegates coding, creates PRs. |
 | `1491111325173022933` | **Outreach-Data** | Email outreach campaign automation. Collects contacts, composes emails, sends via Gmail, manages followups via Google Sheets. |
+| `1491111325173022934` | **Gmail** | Ambassador program email workflows. Processes threads, exports to CSV, sends follow-up emails. |
 | Any other channel | **General** | Direct pass-through to `claude -p` with no special context. |
 
 ## Project Structure
@@ -28,6 +29,7 @@ discord-claude-bot/
 │   ├── result.ts                   # Result file reading utilities
 │   ├── handlers/
 │   │   ├── general.ts              # General pass-through handler
+│   │   ├── gmail.ts                # Ambassador email workflow handler
 │   │   ├── insights-ui.ts          # Two-step worktree workflow
 │   │   └── outreach-data.ts        # Outreach campaign handler
 │   └── jobs/
@@ -38,11 +40,15 @@ discord-claude-bot/
 │       │   ├── send-email/         # config.json + handler.ts
 │       │   ├── send-followup1/
 │       │   └── send-followup2/
-│       └── e-degree/               # E-degree campaign
+│       ├── e-degree/               # E-degree campaign
 │           ├── send-email/
 │           ├── send-followup1/
 │           ├── send-followup2/
 │           └── write-email/
+│       └── gmail/                   # Gmail ambassador workflows
+│           └── send-followup-amb-prgm/
+├── gmail/
+│   └── CLAUDE.md                   # Gmail agent workflow docs
 ├── insights-ui/
 │   └── CLAUDE.md                   # Insights-UI agent workflow docs
 ├── outreach-data/
@@ -134,6 +140,7 @@ Jobs are organized in campaign folders (`amb-prgm/`, `e-degree/`). All jobs are 
 | `e-degree/send-followup1` | Every 10 min | Send 1st followup for e-degree |
 | `e-degree/send-followup2` | Every 10 min | Send 2nd followup for e-degree |
 | `e-degree/write-email` | Every 10 min | Compose emails for 5 e-degree contacts |
+| `gmail/send-followup-amb-prgm` | Every 10 min | Send 1 ambassador program follow-up email |
 
 Run logs are written to `logs/{job-id}.jsonl`.
 

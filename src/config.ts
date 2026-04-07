@@ -46,3 +46,8 @@ export const INSIGHTS_UI_TASK_RESULT = "/tmp/claude-code-result-insights.md";
 export const OUTREACH_DATA_CHANNEL: string = optionalEnv("OUTREACH_DATA_CHANNEL", "1491111325173022933");
 export const OUTREACH_DATA_WORKSPACE: string = optionalEnv("OUTREACH_DATA_WORKSPACE", "/home/ubuntu/.openclaw/workspace-outreach-data");
 export const OUTREACH_DATA_RESULT = "/tmp/claude-code-result-outreach-data.md";
+
+// --- Gmail ---
+export const GMAIL_CHANNEL: string = optionalEnv("GMAIL_CHANNEL", "1491111325173022934");
+export const GMAIL_WORKSPACE: string = optionalEnv("GMAIL_WORKSPACE", "/home/ubuntu/.openclaw/workspace-gmail");
+export const GMAIL_RESULT = "/tmp/claude-code-result-gmail.md";

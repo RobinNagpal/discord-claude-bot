@@ -1,9 +1,10 @@
 import { Client, GatewayIntentBits, type Message } from "discord.js";
-import { DISCORD_TOKEN, PREFIX, ALLOWED_CHANNELS, ALLOWED_USERS, MAX_CONCURRENT, INSIGHTS_UI_CHANNEL, OUTREACH_DATA_CHANNEL } from "./config.js";
+import { DISCORD_TOKEN, PREFIX, ALLOWED_CHANNELS, ALLOWED_USERS, MAX_CONCURRENT, INSIGHTS_UI_CHANNEL, OUTREACH_DATA_CHANNEL, GMAIL_CHANNEL } from "./config.js";
 import { formatError } from "./discord.js";
 import { handleGeneral } from "./handlers/general.js";
 import { handleInsightsUI } from "./handlers/insights-ui.js";
 import { handleOutreachData } from "./handlers/outreach-data.js";
+import { handleGmail } from "./handlers/gmail.js";
 import { startJobScheduler } from "./jobs/jobs.js";
 
 let activeJobs = 0;
@@ -50,6 +51,8 @@ client.on("messageCreate", async (message: Message) => {
       await handleInsightsUI(message, prompt);
     } else if (message.channelId === OUTREACH_DATA_CHANNEL) {
       await handleOutreachData(message, prompt);
+    } else if (message.channelId === GMAIL_CHANNEL) {
+      await handleGmail(message, prompt);
     } else {
       await handleGeneral(message, prompt);
     }

@@ -1,0 +1,15 @@
+{
+  "name": "Send followup email for amb-prgm",
+  "enabled": false,
+  "description": "Send 1 follow-up email from the ambassador program CSV queue",
+  "schedule": {
+    "kind": "every",
+    "everyMs": 600000
+  },
+  "workspace": "/home/ubuntu/.openclaw/workspace-gmail",
+  "resultFile": "/tmp/claude-code-result-gmail.md",
+  "discord": {
+    "channelId": "1491111325173022933",
+    "notify": true
+  }
+}

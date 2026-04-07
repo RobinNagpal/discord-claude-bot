@@ -21,6 +21,7 @@ src/
 ├── result.ts                       # readResultFile(), extractField()
 ├── handlers/
 │   ├── general.ts                  # General pass-through handler
+│   ├── gmail.ts                    # Ambassador email workflow handler
 │   ├── insights-ui.ts              # Two-step worktree workflow handler
 │   └── outreach-data.ts            # Campaign auto-detection + outreach handler
 └── jobs/
@@ -31,14 +32,17 @@ src/
     │   ├── send-email/             # config.json + handler.ts
     │   ├── send-followup1/
     │   └── send-followup2/
-    └── e-degree/                   # E-degree campaign jobs
-        ├── send-email/
-        ├── send-followup1/
-        ├── send-followup2/
-        └── write-email/
+    ├── e-degree/                   # E-degree campaign jobs
+    │   ├── send-email/
+    │   ├── send-followup1/
+    │   ├── send-followup2/
+    │   └── write-email/
+    └── gmail/                      # Gmail ambassador workflow jobs
+        └── send-followup-amb-prgm/
 ```
 
 Other directories:
+- `gmail/CLAUDE.md` — Context docs for the Gmail (ambassador email workflows) agent
 - `insights-ui/CLAUDE.md` — Context docs for the insights-ui (KoalaGains) agent workflow
 - `outreach-data/CLAUDE.md` — Context docs for the outreach-data agent workflow
 - `.env` / `.env.example` — Configuration (bot token, channel IDs, workspace paths)
@@ -62,6 +66,7 @@ npm start              # node dist/bot.js
 The bot routes `!claude <prompt>` messages based on Discord channel ID:
 - **Insights-UI channel** (`INSIGHTS_UI_CHANNEL`) -> `handleInsightsUI()` — Two-step git worktree workflow. Step 1 manages worktrees in the main repo, Step 2 runs the task in the selected worktree.
 - **Outreach-Data channel** (`OUTREACH_DATA_CHANNEL`) -> `handleOutreachData()` — Spawns Claude Code in the outreach-data workspace with campaign context auto-detected from keywords.
+- **Gmail channel** (`GMAIL_CHANNEL`) -> `handleGmail()` — Ambassador email workflows: process threads, export to CSV, send follow-ups. Auto-detects workflow from keywords.
 - **All other channels** -> `handleGeneral()` — Simple pass-through to `claude -p`.
 
 ### How Claude Code Is Invoked (src/claude.ts)
