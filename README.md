@@ -1,10 +1,12 @@
 # Discord Claude Bot
 
-A Discord bot that bridges messages to [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI, with channel-based routing for specialized agent workflows.
+A Discord bot that bridges messages to [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI, with channel-based routing for specialized agent workflows and a built-in job scheduler for recurring tasks.
 
 ## How It Works
 
 Users send `!claude <prompt>` in Discord. The bot spawns a `claude -p` subprocess, captures the output, and replies with the result. Specific channels are routed to specialized handlers with project-specific context.
+
+The bot also includes a job scheduler that runs recurring tasks (e.g. sending outreach emails) on configurable cron or interval schedules.
 
 ## Channel Routing
 
@@ -19,18 +21,37 @@ Users send `!claude <prompt>` in Discord. The bot spawns a `claude -p` subproces
 ```
 discord-claude-bot/
 ├── src/
-│   └── bot.ts              # Main bot (TypeScript, strict mode)
+│   ├── bot.ts                      # Entry point — Discord client, message routing
+│   ├── config.ts                   # Environment variable parsing
+│   ├── claude.ts                   # Claude Code CLI invocation
+│   ├── discord.ts                  # Message splitting, error formatting
+│   ├── result.ts                   # Result file reading utilities
+│   ├── handlers/
+│   │   ├── general.ts              # General pass-through handler
+│   │   ├── insights-ui.ts          # Two-step worktree workflow
+│   │   └── outreach-data.ts        # Outreach campaign handler
+│   └── jobs/
+│       ├── types.ts                # Job type definitions
+│       ├── jobs.ts                 # Job scheduler (recursive discovery, cron/interval)
+│       ├── outreach-prompt.ts      # Shared outreach prompt builder
+│       ├── amb-prgm/               # Ambassador program campaign
+│       │   ├── send-email/         # config.json + handler.ts
+│       │   ├── send-followup1/
+│       │   └── send-followup2/
+│       └── e-degree/               # E-degree campaign
+│           ├── send-email/
+│           ├── send-followup1/
+│           ├── send-followup2/
+│           └── write-email/
 ├── insights-ui/
-│   └── CLAUDE.md           # Insights-UI agent docs (worktree workflow, build commands)
+│   └── CLAUDE.md                   # Insights-UI agent workflow docs
 ├── outreach-data/
-│   └── CLAUDE.md           # Outreach-Data agent docs (campaigns, Gmail/Sheets integration)
-├── .github/
-│   └── workflows/
-│       └── ci.yml          # CI: typecheck, lint, prettier, build
-├── .env.example            # All configurable env vars with defaults
-├── .prettierrc             # Prettier config (160 char width)
-├── eslint.config.mjs       # ESLint strict + stylistic + prettier compat
-├── tsconfig.json           # TypeScript strict config
+│   └── CLAUDE.md                   # Outreach-Data agent workflow docs
+├── .github/workflows/ci.yml       # CI: typecheck, lint, prettier, build
+├── .env.example                    # All configurable env vars
+├── .prettierrc                     # Prettier (160 char width)
+├── eslint.config.mjs               # ESLint strict + stylistic
+├── tsconfig.json                   # TypeScript strict mode
 └── package.json
 ```
 
@@ -94,6 +115,27 @@ In the outreach-data channel (`1491111325173022933`):
 ```
 !claude collect contacts for e-degree universities in Texas
 ```
+
+## Scheduled Jobs
+
+The bot includes a job scheduler that runs recurring tasks automatically. Each job is a directory under `src/jobs/` containing:
+
+- `config.json` — Schedule (cron or interval), workspace path, Discord notification settings, enabled flag
+- `handler.ts` — Builds the Claude Code prompt for the task
+
+Jobs are organized in campaign folders (`amb-prgm/`, `e-degree/`). All jobs are disabled by default — set `"enabled": true` in `config.json` to activate.
+
+| Job | Schedule | Description |
+|---|---|---|
+| `amb-prgm/send-email` | Every 10 min | Send 1 ambassador program outreach email |
+| `amb-prgm/send-followup1` | Every 10 min | Send 1st followup for amb-prgm |
+| `amb-prgm/send-followup2` | Every 10 min | Send 2nd followup for amb-prgm |
+| `e-degree/send-email` | Every 10 min | Send 1 e-degree outreach email |
+| `e-degree/send-followup1` | Every 10 min | Send 1st followup for e-degree |
+| `e-degree/send-followup2` | Every 10 min | Send 2nd followup for e-degree |
+| `e-degree/write-email` | Every 10 min | Compose emails for 5 e-degree contacts |
+
+Run logs are written to `logs/{job-id}.jsonl`.
 
 ## Available Scripts
 

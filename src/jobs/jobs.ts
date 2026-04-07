@@ -197,11 +197,13 @@ async function executeJob(job: LoadedJob): Promise<void> {
 
 function appendRunLog(result: JobRunResult): void {
   const logsDir = path.resolve(import.meta.dirname, "../../logs");
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
+  const logFile = path.join(logsDir, `${result.jobId}.jsonl`);
+  const logFileDir = path.dirname(logFile);
+
+  if (!fs.existsSync(logFileDir)) {
+    fs.mkdirSync(logFileDir, { recursive: true });
   }
 
-  const logFile = path.join(logsDir, `${result.jobId}.jsonl`);
   const line = JSON.stringify(result) + "\n";
   fs.appendFileSync(logFile, line);
 }
