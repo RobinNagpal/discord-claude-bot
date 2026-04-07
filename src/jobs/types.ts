@@ -37,5 +37,5 @@ export interface JobRunResult {
 }
 
 export interface JobHandler {
-  buildPrompt(): string;
+  buildPrompt(config: JobConfig): string;
 }

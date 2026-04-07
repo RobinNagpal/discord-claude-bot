@@ -43,34 +43,51 @@ export function getJobs(): readonly LoadedJob[] {
 }
 
 async function loadJobs(): Promise<void> {
-  const jobsDir = path.resolve(import.meta.dirname, "../../src/jobs");
-  const entries = fs.readdirSync(jobsDir, { withFileTypes: true });
+  // Handlers are compiled to dist/jobs/, configs stay in src/jobs/
+  const compiledJobsDir = import.meta.dirname;
+  const sourceJobsDir = path.resolve(compiledJobsDir, "../../src/jobs");
+
+  await discoverJobs(compiledJobsDir, sourceJobsDir, "");
+}
+
+async function discoverJobs(compiledBase: string, sourceBase: string, relativePath: string): Promise<void> {
+  const compiledDir = path.join(compiledBase, relativePath);
+
+  if (!fs.existsSync(compiledDir)) return;
+
+  const entries = fs.readdirSync(compiledDir, { withFileTypes: true });
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
 
-    const configPath = path.join(jobsDir, entry.name, "config.json");
-    const handlerPath = path.join(import.meta.dirname, entry.name, "handler.js");
+    const childRelative = path.join(relativePath, entry.name);
+    const configPath = path.join(sourceBase, childRelative, "config.json");
+    const handlerPath = path.join(compiledBase, childRelative, "handler.js");
 
-    if (!fs.existsSync(configPath)) continue;
+    if (fs.existsSync(configPath) && fs.existsSync(handlerPath)) {
+      // This directory is a job (has both config.json and handler.js)
+      try {
+        const configRaw = fs.readFileSync(configPath, "utf-8");
+        const config = JSON.parse(configRaw) as JobConfig;
 
-    try {
-      const configRaw = fs.readFileSync(configPath, "utf-8");
-      const config = JSON.parse(configRaw) as JobConfig;
+        const handlerModule = (await import(handlerPath)) as { default: JobHandler };
+        const handler = handlerModule.default;
 
-      const handlerModule = (await import(handlerPath)) as { default: JobHandler };
-      const handler = handlerModule.default;
-
-      jobs.push({
-        id: entry.name,
-        config,
-        handler,
-        nextRunAt: computeNextRun(config),
-        lastRunAt: null,
-        consecutiveErrors: 0,
-      });
-    } catch (err) {
-      console.error(`Failed to load job "${entry.name}":`, err);
+        const jobId = childRelative.replace(/[\\/]/g, "/");
+        jobs.push({
+          id: jobId,
+          config,
+          handler,
+          nextRunAt: computeNextRun(config),
+          lastRunAt: null,
+          consecutiveErrors: 0,
+        });
+      } catch (err) {
+        console.error(`Failed to load job "${childRelative}":`, err);
+      }
+    } else {
+      // Not a job — recurse into subdirectories
+      await discoverJobs(compiledBase, sourceBase, childRelative);
     }
   }
 }
@@ -145,7 +162,7 @@ async function executeJob(job: LoadedJob): Promise<void> {
   };
 
   try {
-    const prompt = job.handler.buildPrompt();
+    const prompt = job.handler.buildPrompt(job.config);
     await runClaude(prompt, { cwd: job.config.workspace });
 
     // Read result file
