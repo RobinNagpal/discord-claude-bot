@@ -20,6 +20,11 @@ const INSIGHTS_UI_WORKTREE_BASE: string = process.env.INSIGHTS_UI_WORKTREE_BASE 
 const INSIGHTS_UI_WORKTREE_RESULT = "/tmp/claude-code-worktree-insights.md";
 const INSIGHTS_UI_TASK_RESULT = "/tmp/claude-code-result-insights.md";
 
+// --- Outreach-Data channel routing ---
+const OUTREACH_DATA_CHANNEL: string = process.env.OUTREACH_DATA_CHANNEL ?? "1491111325173022933";
+const OUTREACH_DATA_WORKSPACE: string = process.env.OUTREACH_DATA_WORKSPACE ?? "/home/ubuntu/.openclaw/workspace-outreach-data";
+const OUTREACH_DATA_RESULT = "/tmp/claude-code-result-outreach-data.md";
+
 function parseList(val: string | undefined): string[] | null {
   if (!val?.trim()) return null;
   return val
@@ -83,6 +88,8 @@ client.on("messageCreate", async (message: Message) => {
   try {
     if (message.channelId === INSIGHTS_UI_CHANNEL) {
       await handleInsightsUI(message, prompt);
+    } else if (message.channelId === OUTREACH_DATA_CHANNEL) {
+      await handleOutreachData(message, prompt);
     } else {
       await handleGeneral(message, prompt);
     }
@@ -219,6 +226,76 @@ When completely finished:
   }
 
   for (const chunk of splitMessage(`**Insights-UI task complete**\n\n${taskResult}`)) {
+    await message.reply(chunk);
+  }
+}
+
+// --- Outreach-Data handler ---
+async function handleOutreachData(message: Message, taskDescription: string): Promise<void> {
+  await message.reply(`Working on outreach-data task...\n**Task:** ${taskDescription}`);
+
+  // Determine which campaign file to reference based on task description
+  const taskLower = taskDescription.toLowerCase();
+  let campaignContext: string;
+  if (taskLower.includes("amb") || taskLower.includes("ambassador") || taskLower.includes("placement")) {
+    campaignContext = `Read the campaign files at: ${OUTREACH_DATA_WORKSPACE}/campaigns/amb-prgm/
+Check campaign-info.md for lead generation, write-emails.md for composing, send-emails.md for sending, followup-1.md and followup-2.md for followups.`;
+  } else if (taskLower.includes("e-degree") || taskLower.includes("edegree") || taskLower.includes("university") || taskLower.includes("mba")) {
+    campaignContext = `Read the campaign file at: ${OUTREACH_DATA_WORKSPACE}/campaigns/e-degree.md`;
+  } else {
+    campaignContext = `Check ${OUTREACH_DATA_WORKSPACE}/campaigns/ to identify the relevant campaign.
+Available campaigns:
+- campaigns/e-degree.md (university e-degree program outreach)
+- campaigns/amb-prgm/ (ambassador program / placement offices)`;
+  }
+
+  const prompt = `You are handling an outreach data task. Read the CLAUDE.md in the current directory for full context.
+
+TASK: ${taskDescription}
+
+${campaignContext}
+
+Campaign assets (Python scripts) are in: ${OUTREACH_DATA_WORKSPACE}/campaign_assets/
+Cron task definitions are in: ${OUTREACH_DATA_WORKSPACE}/cron-tasks/
+
+Environment setup (required for all gog commands):
+export GOG_KEYRING_BACKEND=file
+export GOG_KEYRING_PASSWORD=lollY.789
+
+Google account: ryan@koalagains.com
+Sheet ID: 1Kmg1f0iJbWIv5oWFXQJmxFHVRTO9EKC67SuPDiTcOcc
+
+CRITICAL RULES:
+- ONE email per send invocation — never loop or batch
+- Run find-eligible scripts exactly ONCE per invocation
+- Never guess/invent emails or phone numbers — leave empty if not found
+- Use pipe | separator for values without commas, --values-json for values with commas
+- Format email body as single-line HTML — no literal newlines, use <br>
+- No <p> tags — only <br> and <a> tags
+- Always use --force flag with gog gmail send
+- Vary email wording across sends
+
+When completely finished:
+1. Write summary to ${OUTREACH_DATA_RESULT} including: records found, records added/sent, errors
+2. Run: openclaw system event --text "Done: [brief summary]" --mode now`;
+
+  try {
+    await runClaude(prompt, OUTREACH_DATA_WORKSPACE);
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    await message.reply(`Task failed: ${errMsg.slice(0, 500)}`);
+    return;
+  }
+
+  // Read result
+  let taskResult: string;
+  try {
+    taskResult = fs.readFileSync(OUTREACH_DATA_RESULT, "utf-8");
+  } catch {
+    taskResult = "(Could not read result file)";
+  }
+
+  for (const chunk of splitMessage(`**Outreach-data task complete**\n\n${taskResult}`)) {
     await message.reply(chunk);
   }
 }
