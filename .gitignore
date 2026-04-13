@@ -5,3 +5,5 @@ dist/
 logs/
 insights-ui/dodao-ui/
 insights-ui/worktrees/
+scraping-lambdas/scraping-lambdas/
+scraping-lambdas/worktrees/

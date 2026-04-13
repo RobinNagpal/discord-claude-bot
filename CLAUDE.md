@@ -28,6 +28,7 @@ src/
 │   ├── general.ts                  # General pass-through handler
 │   ├── gmail.ts                    # Ambassador email workflow handler
 │   ├── insights-ui.ts              # Two-step worktree workflow handler
+│   ├── scraping-lambdas.ts         # Thread+worktree workflow for scraping-lambdas monorepo
 │   └── outreach-data.ts            # Campaign auto-detection + outreach handler
 └── jobs/
     ├── types.ts                    # JobConfig, JobSchedule, JobHandler, JobRunResult
@@ -50,6 +51,9 @@ Other directories:
 - `insights-ui/dodao-ui/` — Cloned `RobinNagpal/dodao-ui` repo (main repo for worktree workflow)
 - `insights-ui/worktrees/` — Git worktrees created/managed by the insights-ui handler
 - `insights-ui/CLAUDE.md` — Context docs for the insights-ui (KoalaGains) agent workflow
+- `scraping-lambdas/scraping-lambdas/` — Cloned `RobinNagpal/scraping-lambdas` repo (main repo for that worktree workflow)
+- `scraping-lambdas/worktrees/` — Git worktrees created/managed by the scraping-lambdas handler
+- `scraping-lambdas/CLAUDE.md` — Context docs for the scraping-lambdas agent workflow
 - `gmail/CLAUDE.md` — Context docs for the Gmail (ambassador email workflows) agent
 - `outreach-data/CLAUDE.md` — Context docs for the outreach-data agent workflow
 - `.env` / `.env.example` — Configuration (bot token, channel IDs, workspace paths)
@@ -72,6 +76,7 @@ npm start              # node dist/bot.js
 ### Channel Routing (src/bot.ts)
 The bot routes `!claude <prompt>` messages based on Discord channel ID:
 - **Insights-UI channel** (`INSIGHTS_UI_CHANNEL`) -> `handleInsightsUI()` — Two-step git worktree workflow. Step 1 manages worktrees in the main repo, Step 2 runs the task in the selected worktree.
+- **Scraping-Lambdas channel** (`SCRAPING_LAMBDAS_CHANNEL`) -> `handleScrapingLambdas()` — Same thread+worktree workflow as insights-ui, pointed at the `scraping-lambdas` monorepo. Per-subproject quality checks (`yarn compile && yarn prettier-check`).
 - **Outreach-Data channel** (`OUTREACH_DATA_CHANNEL`) -> `handleOutreachData()` — Spawns Claude Code in the outreach-data workspace with campaign context auto-detected from keywords.
 - **Gmail channel** (`GMAIL_CHANNEL`) -> `handleGmail()` — Ambassador email workflows: process threads, export to CSV, send follow-ups. Auto-detects workflow from keywords.
 - **All other channels** -> `handleGeneral()` — Simple pass-through to `claude -p`.

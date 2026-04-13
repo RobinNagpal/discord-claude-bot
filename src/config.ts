@@ -45,6 +45,22 @@ export const INSIGHTS_UI_ROUTE_RESULT = "/tmp/claude-code-route-insights.json";
 export const INSIGHTS_UI_EXCHANGE_LOG = "/home/ubuntu/discord-claude-bot/insights-ui/discord-message-exchange.md";
 export const INSIGHTS_UI_THREAD_LOGS_DIR = "/home/ubuntu/discord-claude-bot/insights-ui/discord-thread-logs";
 
+// --- Scraping-Lambdas ---
+export const SCRAPING_LAMBDAS_CHANNEL: string = optionalEnv("SCRAPING_LAMBDAS_CHANNEL", "1493070478577897543");
+export const SCRAPING_LAMBDAS_MAIN_REPO: string = optionalEnv(
+  "SCRAPING_LAMBDAS_MAIN_REPO",
+  "/home/ubuntu/discord-claude-bot/scraping-lambdas/scraping-lambdas",
+);
+export const SCRAPING_LAMBDAS_WORKTREE_BASE: string = optionalEnv(
+  "SCRAPING_LAMBDAS_WORKTREE_BASE",
+  "/home/ubuntu/discord-claude-bot/scraping-lambdas/worktrees",
+);
+export const SCRAPING_LAMBDAS_WORKTREE_RESULT = "/tmp/claude-code-worktree-scraping-lambdas.md";
+export const SCRAPING_LAMBDAS_TASK_RESULT = "/tmp/claude-code-result-scraping-lambdas.md";
+export const SCRAPING_LAMBDAS_ROUTE_RESULT = "/tmp/claude-code-route-scraping-lambdas.json";
+export const SCRAPING_LAMBDAS_EXCHANGE_LOG = "/home/ubuntu/discord-claude-bot/scraping-lambdas/discord-message-exchange.md";
+export const SCRAPING_LAMBDAS_THREAD_LOGS_DIR = "/home/ubuntu/discord-claude-bot/scraping-lambdas/discord-thread-logs";
+
 // --- Outreach-Data ---
 export const OUTREACH_DATA_CHANNEL: string = optionalEnv("OUTREACH_DATA_CHANNEL", "1491111325173022933");
 export const OUTREACH_DATA_WORKSPACE: string = optionalEnv("OUTREACH_DATA_WORKSPACE", "/home/ubuntu/.openclaw/workspace-outreach-data");
