@@ -133,7 +133,8 @@ function parseRouteDecision(raw: string): RouteDecision | null {
     case "prune_worktrees":
       return { command: "prune_worktrees" };
     case "list_prs": {
-      const state = typeof obj.state === "string" && ["open", "merged", "closed", "all"].includes(obj.state) ? (obj.state as "open" | "merged" | "closed" | "all") : "open";
+      const state =
+        typeof obj.state === "string" && ["open", "merged", "closed", "all"].includes(obj.state) ? (obj.state as "open" | "merged" | "closed" | "all") : "open";
       return { command: "list_prs", state };
     }
     case "close_pr":
