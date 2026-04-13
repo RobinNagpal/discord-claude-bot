@@ -279,16 +279,11 @@ function cleanMarkdownValue(val: string): string {
 }
 
 function parseWorktreeResult(worktreeInfo: string): { worktreePath: string | null; branchName: string | null } {
-  const pathMatch =
-    worktreeInfo.match(/path[*:\s]*`([^`\n]+)`/i) ?? worktreeInfo.match(/path[*:\s]+([^\n]+)/i) ?? worktreeInfo.match(/(\/[^\s`]*\/worktrees\/[^\s`]+)/);
-  const branchMatch = worktreeInfo.match(/branch[*:\s]*`([^`\n]+)`/i) ?? worktreeInfo.match(/branch[*:\s]+([^\n]+)/i);
+  const pathMatch = worktreeInfo.match(/path[^`\n]*`([^`\n]+)`/i) ?? worktreeInfo.match(/(\/[^\s`]*\/worktrees\/[^\s`]+)/);
+  const branchMatch = worktreeInfo.match(/branch[^`\n]*`([^`\n]+)`/i);
 
   const worktreePath = pathMatch ? cleanMarkdownValue(pathMatch[1]) : null;
-  let branchName = branchMatch ? cleanMarkdownValue(branchMatch[1]) : null;
-
-  if (branchName && /^(name|status)$/i.test(branchName)) {
-    branchName = null;
-  }
+  const branchName = branchMatch ? cleanMarkdownValue(branchMatch[1]) : null;
 
   return { worktreePath, branchName };
 }
