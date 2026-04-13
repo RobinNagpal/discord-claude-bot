@@ -102,6 +102,55 @@ For development with auto-recompile:
 npm run dev
 ```
 
+### 5. Run as a Service (production)
+
+To keep the bot running across SSH disconnects, crashes, and reboots, run it as a **systemd user service**.
+
+Create `~/.config/systemd/user/discord-claude-bot.service`:
+
+```ini
+[Unit]
+Description=Discord Claude Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/discord-claude-bot
+ExecStart=/home/ubuntu/.nvm/versions/node/v22.22.0/bin/node dist/bot.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=PATH=/home/ubuntu/.local/bin:/home/ubuntu/.nvm/versions/node/v22.22.0/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/home/ubuntu
+
+[Install]
+WantedBy=default.target
+```
+
+Adjust `WorkingDirectory`, the `node` path in `ExecStart`, and the `PATH` (must include the `claude` and `gh` binaries) for your environment.
+
+Enable, start, and make it survive logout:
+
+```bash
+npm run build
+systemctl --user daemon-reload
+systemctl --user enable --now discord-claude-bot
+sudo loginctl enable-linger $USER     # keeps user services running after logout
+```
+
+Day-to-day operation:
+
+```bash
+systemctl --user status discord-claude-bot     # check status
+systemctl --user restart discord-claude-bot    # restart (after a code change)
+systemctl --user stop discord-claude-bot       # stop
+journalctl --user -u discord-claude-bot -f     # tail logs
+```
+
+After any code change: `npm run build && systemctl --user restart discord-claude-bot`.
+
 ## Usage
 
 In any Discord channel the bot can see:

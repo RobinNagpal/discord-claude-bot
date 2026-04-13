@@ -37,10 +37,13 @@ export const MAX_BUFFER: number = optionalEnvInt("MAX_BUFFER", 1024 * 1024);
 
 // --- Insights-UI ---
 export const INSIGHTS_UI_CHANNEL: string = optionalEnv("INSIGHTS_UI_CHANNEL", "1491102767224324309");
-export const INSIGHTS_UI_MAIN_REPO: string = optionalEnv("INSIGHTS_UI_MAIN_REPO", "/home/ubuntu/.openclaw/workspace-insights-ui/dodao-ui");
-export const INSIGHTS_UI_WORKTREE_BASE: string = optionalEnv("INSIGHTS_UI_WORKTREE_BASE", "/home/ubuntu/.openclaw/workspace-insights-ui/worktrees");
+export const INSIGHTS_UI_MAIN_REPO: string = optionalEnv("INSIGHTS_UI_MAIN_REPO", "/home/ubuntu/discord-claude-bot/insights-ui/dodao-ui");
+export const INSIGHTS_UI_WORKTREE_BASE: string = optionalEnv("INSIGHTS_UI_WORKTREE_BASE", "/home/ubuntu/discord-claude-bot/insights-ui/worktrees");
 export const INSIGHTS_UI_WORKTREE_RESULT = "/tmp/claude-code-worktree-insights.md";
 export const INSIGHTS_UI_TASK_RESULT = "/tmp/claude-code-result-insights.md";
+export const INSIGHTS_UI_ROUTE_RESULT = "/tmp/claude-code-route-insights.json";
+export const INSIGHTS_UI_EXCHANGE_LOG = "/home/ubuntu/discord-claude-bot/insights-ui/discord-message-exchange.md";
+export const INSIGHTS_UI_THREAD_LOGS_DIR = "/home/ubuntu/discord-claude-bot/insights-ui/discord-thread-logs";
 
 // --- Outreach-Data ---
 export const OUTREACH_DATA_CHANNEL: string = optionalEnv("OUTREACH_DATA_CHANNEL", "1491111325173022933");

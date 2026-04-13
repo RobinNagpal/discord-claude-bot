@@ -1,13 +1,14 @@
-import { Client, GatewayIntentBits, type Message } from "discord.js";
+import { Client, GatewayIntentBits, ChannelType, type Message, type ThreadChannel } from "discord.js";
 import { DISCORD_TOKEN, PREFIX, ALLOWED_CHANNELS, ALLOWED_USERS, MAX_CONCURRENT, INSIGHTS_UI_CHANNEL, OUTREACH_DATA_CHANNEL, GMAIL_CHANNEL } from "./config.js";
 import { formatError } from "./discord.js";
 import { handleGeneral } from "./handlers/general.js";
-import { handleInsightsUI } from "./handlers/insights-ui.js";
+import { handleInsightsUI, handleInsightsUIThread } from "./handlers/insights-ui.js";
 import { handleOutreachData } from "./handlers/outreach-data.js";
 import { handleGmail } from "./handlers/gmail.js";
 import { startJobScheduler } from "./jobs/jobs.js";
 
 let activeJobs = 0;
+let shuttingDown = false;
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -29,6 +30,11 @@ client.on("messageCreate", async (message: Message) => {
 
   if (ALLOWED_CHANNELS && !ALLOWED_CHANNELS.includes(message.channelId)) return;
 
+  if (shuttingDown) {
+    await message.reply("Bot is restarting for an update — please resend in a moment.");
+    return;
+  }
+
   if (ALLOWED_USERS && !ALLOWED_USERS.includes(message.author.id)) {
     await message.reply("You are not authorized to use this bot.");
     return;
@@ -44,10 +50,16 @@ client.on("messageCreate", async (message: Message) => {
     return;
   }
 
+  const channel = message.channel;
+  const inInsightsUiThread =
+    (channel.type === ChannelType.PublicThread || channel.type === ChannelType.PrivateThread) && channel.parentId === INSIGHTS_UI_CHANNEL;
+
   activeJobs++;
 
   try {
-    if (message.channelId === INSIGHTS_UI_CHANNEL) {
+    if (inInsightsUiThread) {
+      await handleInsightsUIThread(message, channel as ThreadChannel, prompt);
+    } else if (message.channelId === INSIGHTS_UI_CHANNEL) {
       await handleInsightsUI(message, prompt);
     } else if (message.channelId === OUTREACH_DATA_CHANNEL) {
       await handleOutreachData(message, prompt);
@@ -62,5 +74,32 @@ client.on("messageCreate", async (message: Message) => {
     activeJobs--;
   }
 });
+
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[shutdown] received ${signal}, draining ${activeJobs} active job(s)...`);
+
+  const deadline = Date.now() + 32 * 60 * 1000;
+  while (activeJobs > 0 && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+
+  if (activeJobs > 0) {
+    console.log(`[shutdown] drain timeout, ${activeJobs} job(s) still running, exiting anyway`);
+  } else {
+    console.log("[shutdown] drained cleanly");
+  }
+
+  try {
+    await client.destroy();
+  } catch {
+    // ignore
+  }
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => void gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => void gracefulShutdown("SIGINT"));
 
 client.login(DISCORD_TOKEN);

@@ -1,4 +1,4 @@
-import type { Message } from "discord.js";
+import type { Message, ThreadChannel } from "discord.js";
 
 const MAX_DISCORD_LENGTH = 1900;
 
@@ -34,6 +34,12 @@ export function splitMessage(text: string): string[] {
 export async function replyInChunks(message: Message, text: string): Promise<void> {
   for (const chunk of splitMessage(text)) {
     await message.reply(chunk);
+  }
+}
+
+export async function sendInChunks(thread: ThreadChannel, text: string): Promise<void> {
+  for (const chunk of splitMessage(text)) {
+    await thread.send(chunk);
   }
 }
 

@@ -3,3 +3,5 @@ dist/
 .env
 *.js.map
 logs/
+insights-ui/dodao-ui/
+insights-ui/worktrees/

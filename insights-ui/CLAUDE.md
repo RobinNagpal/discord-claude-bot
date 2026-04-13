@@ -1,87 +1,69 @@
-# Insights-UI Agent (KoalaGains)
+# Insights-UI Agent (KoalaGains) — In-Worktree Instructions
 
-## Overview
-Coordinator agent for the "insights-ui" (KoalaGains) project in the DoDAO monorepo. This agent does NOT write code directly — it delegates all coding work to Claude Code via CLI subprocess.
+You are Claude Code running **inside a git worktree** that the Discord bot already created and `cd`'d into for you. Your job is to do the actual coding work for the task you've been given.
+
+> Discord routing, thread creation, worktree creation/cleanup, and session continuity (`claude -c`) are **already handled by the bot**. You do not need to manage any of that. See `README.md` in this folder for the full orchestration details.
+
+## What the bot already did before invoking you (summary)
+
+Depending on which path you were spawned through:
+
+**If this is a new task (Step 2 of a new-task flow):**
+1. The bot received a `!claude <task>` message in the insights-ui Discord channel.
+2. It ran a Step 1 Claude process in the main repo (`dodao-ui/`) that: verified `main`, pulled, and ran `git worktree add worktrees/<branch> -b <branch> main` to create *your* worktree. Existing worktrees are left alone — cleanup only happens on explicit maintenance requests.
+3. It parsed Step 1's output, created a Discord thread named after `<branch>`, and posted a kickoff message there.
+4. It then spawned **you** (`claude -p`) with `cwd` set to your worktree. The user-facing channel exchange is logged to `discord-message-exchange.md`; the thread (where your reply will go) is logged to `discord-thread-logs/<branch>.md`.
+
+**If this is a follow-up message in an existing thread:**
+1. The user posted in a thread under the insights-ui channel.
+2. The bot mapped `thread.name` → `worktrees/<thread.name>`, verified the worktree exists, and spawned **you** with `claude -c -p` in that cwd. The `-c` flag means your prior session in this worktree is automatically resumed — you already have full context from earlier messages.
+
+**If this is a maintenance request** (keywords like `cleanup`, `prune`, `delete worktree`, `status`, `list`, `delete pr`, `close pr`): you were spawned in `dodao-ui/` (main repo) with no thread and no new worktree. Just do the maintenance and write the summary.
+
+### What you must do
+- Write your final summary to `/tmp/claude-code-result-insights.md` — the bot reads that file and posts it back to Discord.
+- The bot deletes that file before every invocation, so don't rely on prior contents.
+- Stdout is captured but not relayed; the result file is the canonical reply channel.
 
 ## Project Details
 - **Project:** KoalaGains (insights-ui) in the DoDAO UI monorepo
-- **Workspace:** `/home/ubuntu/.openclaw/workspace-insights-ui`
-- **Main repo (READ-ONLY):** `/home/ubuntu/.openclaw/workspace-insights-ui/dodao-ui`
 - **Project path within repo:** `dodao-ui/insights-ui`
-- **Discord channel:** `1479301663499227257`
+- **Main repo (READ-ONLY, stays on `main`):** `/home/ubuntu/discord-claude-bot/insights-ui/dodao-ui`
+- **Worktree base:** `/home/ubuntu/discord-claude-bot/insights-ui/worktrees/`
+- **Convention:** worktree folder name = branch name
 
-## Worktree-Based Workflow (Mandatory)
+## Rules (when working in a worktree)
+1. **Safety check first:** `pwd` must contain `/worktrees/`, and `git branch --show-current` must NOT be `main` or `master`.
+2. Stay on the current branch — do NOT switch branches.
+3. Do NOT run git commands in the main repo (`dodao-ui/`).
+4. Never commit on `main`.
 
-All code changes happen in git worktrees. The main repo checkout must always stay on the `main` branch and is READ-ONLY.
+## When finished with a coding task
+1. Run quality checks: `yarn lint && yarn prettier-check && yarn build`
+2. Commit all changes
+3. Push: `git push -u origin <branch>`
+4. Determine the current PR for this branch:
+   - Check for an **open** PR: `gh pr list --head <branch> --state open --json number,url`
+   - If an open PR exists, your push already updated it — use that URL.
+   - If none exists, create a new one: `gh pr create --base main --head <branch> --title "..." --body "..."` and use the returned URL.
+   - **Do NOT reuse a merged or closed PR URL.** Old merged PRs from earlier rounds of work on this same branch are stale.
+5. Write summary to `/tmp/claude-code-result-insights.md`. The `PR:` line MUST point to the current open PR (the one you just pushed to or created), never a previously merged one.
 
-- **Worktree base dir:** `/home/ubuntu/.openclaw/workspace-insights-ui/worktrees/`
-- **Convention:** worktree folder name = branch name (e.g., `worktrees/fix-auth/` -> branch `fix-auth`)
+If the task is ambiguous, do NOT invent requirements — ask for clarification instead of committing code.
 
-### Two-Step Flow
+## Long-lived branches and multiple PRs
 
-**Step 1 — Worktree Management** (run in main repo dir):
-1. Safety check: ensure main repo is on `main` branch
-2. `git pull origin main` to update
-3. Clean up worktrees with merged PRs: `git worktree list`, check each with `gh pr list --head <branch> --state merged`, remove if merged
-4. Run `git worktree prune` to clean stale references
-5. Create a new worktree+branch for the task: `git worktree add /home/ubuntu/.openclaw/workspace-insights-ui/worktrees/<branch-name> -b <branch-name> main`
-6. Only reuse an existing worktree if the task is explicitly a continuation of that branch's work
-7. Write result to `/tmp/claude-code-worktree-insights.md`
+Threads and worktrees often live longer than a single PR. The user may keep working in the same thread / same worktree / same branch across many tasks, **merging PRs along the way**. After a merge, GitHub closes that PR but the branch and worktree remain. Expect this flow:
 
-**Step 2 — Do Work** (run in the selected worktree dir):
-1. Safety check: working directory must contain `/worktrees/` in the path, branch must NOT be `main`
-2. Perform the requested coding task
-3. Run quality checks: `yarn lint && yarn prettier-check && yarn build`
-4. Commit all changes, push branch, create PR if none exists
-5. Write summary to `/tmp/claude-code-result-insights.md` (files changed, branch, commit hash, PR URL, worktree list)
+1. Round 1: you push commits → open PR #100 → user merges → PR #100 closes.
+2. Round 2 (same thread, same branch, `claude -c` resumes): branch still exists locally, worktree is intact, but PR #100 is gone. You must create PR #101 for the new commits.
+3. Round 3: same again — PR #102, etc.
 
-## Claude Code Spawn Commands
-
-### Step 1 — Worktree Management
-```
-claude -p --dangerously-skip-permissions 'WORKTREE MANAGEMENT TASK (do NOT write any application code):
-
-0. SAFETY CHECK — Verify main repo is on the main branch:
-   Run: git branch --show-current
-   If NOT on main: run `git checkout main` IMMEDIATELY.
-
-1. UPDATE MAIN: git pull origin main
-
-2. CLEANUP — Run `git worktree list`. For each worktree (skip main repo line):
-   - Check if branch has a merged PR: `gh pr list --head <branch> --state merged --json number`
-   - If merged: `git worktree remove <path> && git branch -d <branch>`
-   - Run `git worktree prune`
-
-3. SELECT OR CREATE — For the task: "SHORT_TASK_DESCRIPTION"
-   - For any NEW task, create a new worktree+branch:
-     `git worktree add /home/ubuntu/.openclaw/workspace-insights-ui/worktrees/<branch-name> -b <branch-name> main`
-   - Only reuse existing worktree for explicit continuations.
-
-4. VERIFY — Confirm main repo is still on main.
-
-5. Write result to /tmp/claude-code-worktree-insights.md'
-```
-
-### Step 2 — Do Work in Worktree
-```
-claude -p --dangerously-skip-permissions 'SAFETY CHECK (do this FIRST):
-1. Run: pwd — must contain "/worktrees/"
-2. Run: git branch --show-current — must NOT be "main"
-
-TASK: DESCRIBE_THE_ACTUAL_TASK
-
-Read CLAUDE.md at the repo root for full workflow instructions.
-
-RULES:
-- Stay on the task branch. Do NOT switch branches.
-- Do NOT run git commands in the main repo.
-
-When finished:
-1. Run: yarn lint && yarn prettier-check && yarn build
-2. Commit and push
-3. Create PR if none exists: gh pr create --base main --head <branch>
-4. Write summary to /tmp/claude-code-result-insights.md'
-```
+Rules for this scenario:
+- Always check for an **open** PR before assuming one exists. `gh pr list --head <branch> --state open` is the source of truth — never trust the URL from a previous reply in this thread.
+- If `git status` shows the branch is ahead of `origin/main` with no open PR, **create a new PR** — don't skip this step thinking one already exists.
+- If the branch was force-reset or rebased onto a fresh main after a merge, that's fine; just push and open a new PR as normal.
+- The `Files:` line in your summary should reflect what changed in **this round only** (since the previous merge), not the cumulative diff against main.
 
 ## Build Commands
 - `yarn lint` / `yarn lint-fix`
@@ -93,10 +75,3 @@ When finished:
 - Repo root `CLAUDE.md` for full development guidelines
 - `docs/ai-knowledge/AIKnowledge.md` for architecture context
 - `docs/ai-knowledge/projects/insights-ui/` for project-specific docs
-
-## Rules
-- Never write code directly — always delegate to Claude Code CLI
-- Always use the two-step worktree flow: Step 1 (manage) -> Step 2 (work)
-- Never commit on `main` — all work happens on feature branches in worktrees
-- Always commit, push, and create PR for code changes
-- Pre-commit sequence: lint -> prettier-check -> build -> commit

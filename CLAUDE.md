@@ -3,6 +3,11 @@
 ## Project Overview
 Discord bot that bridges messages to Claude Code CLI with channel-based routing for specialized agent workflows, plus a built-in job scheduler for recurring tasks. Written in TypeScript with strict types.
 
+## Discord App
+- **App ID:** 1492686913025605642
+- **Public Key:** 4bf54558c82e280bdbdef31929e11c5b43754191f32df44a6b38baa8bf69ad54
+- **Bot Invite URL:** https://discord.com/oauth2/authorize?client_id=1492686913025605642&permissions=2322563698519104&integration_type=0&scope=bot
+
 ## Tech Stack
 - **Runtime:** Node.js 20+
 - **Language:** TypeScript (strict mode, ESM)
@@ -42,8 +47,10 @@ src/
 ```
 
 Other directories:
-- `gmail/CLAUDE.md` — Context docs for the Gmail (ambassador email workflows) agent
+- `insights-ui/dodao-ui/` — Cloned `RobinNagpal/dodao-ui` repo (main repo for worktree workflow)
+- `insights-ui/worktrees/` — Git worktrees created/managed by the insights-ui handler
 - `insights-ui/CLAUDE.md` — Context docs for the insights-ui (KoalaGains) agent workflow
+- `gmail/CLAUDE.md` — Context docs for the Gmail (ambassador email workflows) agent
 - `outreach-data/CLAUDE.md` — Context docs for the outreach-data agent workflow
 - `.env` / `.env.example` — Configuration (bot token, channel IDs, workspace paths)
 
