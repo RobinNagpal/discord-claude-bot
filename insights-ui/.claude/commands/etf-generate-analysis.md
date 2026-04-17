@@ -1,9 +1,15 @@
 # ETF Prompt Review - Skill 2: Create Generation Requests for ETFs
 
-Create analysis generation requests for a specific report category on a set of ETFs.
+Create analysis generation requests for a specific report category on a set of ETFs. This skill prefers reading ETFs from the “run file” produced by Skill 1, and will write request results back into that same file.
 
 ## Arguments
-The user provides: `<category> <ETF1> <ETF2> ...` or just `<category>` if ETFs were already picked by Skill 1.
+The user provides either:
+
+- `<runFilePath>` (recommended), or
+- `<category> <ETF1> <ETF2> ...`, or
+- just `<category>` (if ETFs were already picked by Skill 1 in this conversation)
+
+If a file path is provided, the skill must read `category` + ETF list from that file and treat it as the source of truth.
 
 Categories: `PerformanceAndReturns`, `CostEfficiencyAndTeam`, `RiskAnalysis`
 
@@ -13,7 +19,13 @@ User input: $ARGUMENTS
 
 ### Step 1: Determine the ETFs and category
 
-Parse the user input to get:
+Resolve inputs in this priority order:
+
+1) **If a run file path is provided**, read it and extract:
+- **category** (from the “Run inputs” section)
+- **ETFs** from the `## ETFs` markdown table (`exchange`, `symbol`, `name` columns; ignore other columns)
+
+2) Otherwise parse the user input to get:
 - **category**: One of `PerformanceAndReturns`, `CostEfficiencyAndTeam`, `RiskAnalysis`
 - **ETFs**: Either from the arguments (e.g. "CostEfficiencyAndTeam VOO SPY AGG TLT") or from the most recent `/project:etf-pick-and-fetch` run in this conversation
 
@@ -41,7 +53,23 @@ Set the regenerate flag to `true` ONLY for the requested category. Set all other
 
 Send all ETFs in a single request (the API accepts an array).
 
-### Step 3: Report results
+### Step 3: Write results back to the run file (if available)
+
+If you resolved ETFs from a run file, update that same file by appending (or replacing) a section:
+
+```markdown
+## Generation requests
+
+- category: <Category>
+- createdAt: <YYYY-MM-DDTHH:mm:ssZ>
+
+### Results
+- <EXCHANGE>:<SYMBOL> — success (requestId: <...>) | error: <...>
+```
+
+Do not change the ETF selection. Only record results.
+
+### Step 4: Report results
 
 Print a summary showing:
 - Which ETFs had generation requests created
