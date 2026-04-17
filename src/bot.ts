@@ -11,7 +11,8 @@ import {
   OUTREACH_DATA_CHANNEL,
   GMAIL_CHANNEL,
 } from "./config.js";
-import { formatError } from "./discord.js";
+import { formatError, replyInChunks } from "./discord.js";
+import { getAudioAttachments, transcribeAttachments } from "./audio.js";
 import { handleGeneral } from "./handlers/general.js";
 import { handleInsightsUI, handleInsightsUIThread } from "./handlers/insights-ui.js";
 import { handleScrapingLambdas, handleScrapingLambdasThread } from "./handlers/scraping-lambdas.js";
@@ -34,12 +35,24 @@ client.on("ready", () => {
 
 client.on("messageCreate", async (message: Message) => {
   if (message.author.bot) return;
-  if (!message.content.startsWith(PREFIX)) return;
 
-  const afterPrefix = message.content.slice(PREFIX.length);
-  if (afterPrefix.length > 0 && afterPrefix[0] !== " ") return;
+  const channel = message.channel;
+  const isThread = channel.type === ChannelType.PublicThread || channel.type === ChannelType.PrivateThread;
+  const inInsightsUiThread = isThread && channel.parentId === INSIGHTS_UI_CHANNEL;
+  const inScrapingLambdasThread = isThread && channel.parentId === SCRAPING_LAMBDAS_CHANNEL;
+  const inDiscordBotThread = isThread && channel.parentId === DISCORD_BOT_CHANNEL;
+  const inWorktreeThread = inInsightsUiThread || inScrapingLambdasThread || inDiscordBotThread;
 
-  const prompt = afterPrefix.trim();
+  const audioAttachments = inWorktreeThread ? getAudioAttachments(message) : [];
+  const hasAudio = audioAttachments.length > 0;
+
+  if (!hasAudio) {
+    if (!message.content.startsWith(PREFIX)) return;
+    const afterPrefix = message.content.slice(PREFIX.length);
+    if (afterPrefix.length > 0 && afterPrefix[0] !== " ") return;
+  }
+
+  const textPrompt = message.content.startsWith(PREFIX) ? message.content.slice(PREFIX.length).trim() : message.content.trim();
 
   if (ALLOWED_CHANNELS && !ALLOWED_CHANNELS.includes(message.channelId)) return;
 
@@ -53,7 +66,7 @@ client.on("messageCreate", async (message: Message) => {
     return;
   }
 
-  if (!prompt) {
+  if (!hasAudio && !textPrompt) {
     await message.reply(`Please provide a prompt after \`${PREFIX}\`.`);
     return;
   }
@@ -63,15 +76,27 @@ client.on("messageCreate", async (message: Message) => {
     return;
   }
 
-  const channel = message.channel;
-  const isThread = channel.type === ChannelType.PublicThread || channel.type === ChannelType.PrivateThread;
-  const inInsightsUiThread = isThread && channel.parentId === INSIGHTS_UI_CHANNEL;
-  const inScrapingLambdasThread = isThread && channel.parentId === SCRAPING_LAMBDAS_CHANNEL;
-  const inDiscordBotThread = isThread && channel.parentId === DISCORD_BOT_CHANNEL;
-
   activeJobs++;
 
   try {
+    let prompt = textPrompt;
+    if (hasAudio) {
+      await message.reply(`Transcribing ${audioAttachments.length} audio attachment(s)...`);
+      let transcript: string;
+      try {
+        transcript = await transcribeAttachments(audioAttachments);
+      } catch (err) {
+        await message.reply(`Transcription failed: ${formatError(err)}`);
+        return;
+      }
+      if (!transcript) {
+        await message.reply("Transcription returned no text.");
+        return;
+      }
+      await replyInChunks(message, `**Transcript:**\n${transcript}`);
+      prompt = [textPrompt, transcript].filter((s) => s.length > 0).join("\n\n");
+    }
+
     if (inInsightsUiThread) {
       await handleInsightsUIThread(message, channel as ThreadChannel, prompt);
     } else if (inScrapingLambdasThread) {
