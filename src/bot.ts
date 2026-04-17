@@ -7,6 +7,7 @@ import {
   MAX_CONCURRENT,
   INSIGHTS_UI_CHANNEL,
   SCRAPING_LAMBDAS_CHANNEL,
+  DISCORD_BOT_CHANNEL,
   OUTREACH_DATA_CHANNEL,
   GMAIL_CHANNEL,
 } from "./config.js";
@@ -14,6 +15,7 @@ import { formatError } from "./discord.js";
 import { handleGeneral } from "./handlers/general.js";
 import { handleInsightsUI, handleInsightsUIThread } from "./handlers/insights-ui.js";
 import { handleScrapingLambdas, handleScrapingLambdasThread } from "./handlers/scraping-lambdas.js";
+import { handleDiscordBot, handleDiscordBotThread } from "./handlers/discord-bot.js";
 import { handleOutreachData } from "./handlers/outreach-data.js";
 import { handleGmail } from "./handlers/gmail.js";
 import { startJobScheduler } from "./jobs/jobs.js";
@@ -65,6 +67,7 @@ client.on("messageCreate", async (message: Message) => {
   const isThread = channel.type === ChannelType.PublicThread || channel.type === ChannelType.PrivateThread;
   const inInsightsUiThread = isThread && channel.parentId === INSIGHTS_UI_CHANNEL;
   const inScrapingLambdasThread = isThread && channel.parentId === SCRAPING_LAMBDAS_CHANNEL;
+  const inDiscordBotThread = isThread && channel.parentId === DISCORD_BOT_CHANNEL;
 
   activeJobs++;
 
@@ -73,10 +76,14 @@ client.on("messageCreate", async (message: Message) => {
       await handleInsightsUIThread(message, channel as ThreadChannel, prompt);
     } else if (inScrapingLambdasThread) {
       await handleScrapingLambdasThread(message, channel as ThreadChannel, prompt);
+    } else if (inDiscordBotThread) {
+      await handleDiscordBotThread(message, channel as ThreadChannel, prompt);
     } else if (message.channelId === INSIGHTS_UI_CHANNEL) {
       await handleInsightsUI(message, prompt);
     } else if (message.channelId === SCRAPING_LAMBDAS_CHANNEL) {
       await handleScrapingLambdas(message, prompt);
+    } else if (message.channelId === DISCORD_BOT_CHANNEL) {
+      await handleDiscordBot(message, prompt);
     } else if (message.channelId === OUTREACH_DATA_CHANNEL) {
       await handleOutreachData(message, prompt);
     } else if (message.channelId === GMAIL_CHANNEL) {

@@ -61,6 +61,16 @@ export const SCRAPING_LAMBDAS_ROUTE_RESULT = "/tmp/claude-code-route-scraping-la
 export const SCRAPING_LAMBDAS_EXCHANGE_LOG = "/home/ubuntu/discord-claude-bot/scraping-lambdas/discord-message-exchange.md";
 export const SCRAPING_LAMBDAS_THREAD_LOGS_DIR = "/home/ubuntu/discord-claude-bot/scraping-lambdas/discord-thread-logs";
 
+// --- Discord-Bot (self) ---
+export const DISCORD_BOT_CHANNEL: string = optionalEnv("DISCORD_BOT_CHANNEL", "1494631048414236734");
+export const DISCORD_BOT_MAIN_REPO: string = optionalEnv("DISCORD_BOT_MAIN_REPO", "/home/ubuntu/discord-claude-bot/discord-bot/discord-claude-bot");
+export const DISCORD_BOT_WORKTREE_BASE: string = optionalEnv("DISCORD_BOT_WORKTREE_BASE", "/home/ubuntu/discord-claude-bot/discord-bot/worktrees");
+export const DISCORD_BOT_WORKTREE_RESULT = "/tmp/claude-code-worktree-discord-bot.md";
+export const DISCORD_BOT_TASK_RESULT = "/tmp/claude-code-result-discord-bot.md";
+export const DISCORD_BOT_ROUTE_RESULT = "/tmp/claude-code-route-discord-bot.json";
+export const DISCORD_BOT_EXCHANGE_LOG = "/home/ubuntu/discord-claude-bot/discord-bot/discord-message-exchange.md";
+export const DISCORD_BOT_THREAD_LOGS_DIR = "/home/ubuntu/discord-claude-bot/discord-bot/discord-thread-logs";
+
 // --- Outreach-Data ---
 export const OUTREACH_DATA_CHANNEL: string = optionalEnv("OUTREACH_DATA_CHANNEL", "1491111325173022933");
 export const OUTREACH_DATA_WORKSPACE: string = optionalEnv("OUTREACH_DATA_WORKSPACE", "/home/ubuntu/.openclaw/workspace-outreach-data");

@@ -7,3 +7,5 @@ insights-ui/dodao-ui/
 insights-ui/worktrees/
 scraping-lambdas/scraping-lambdas/
 scraping-lambdas/worktrees/
+discord-bot/discord-claude-bot/
+discord-bot/worktrees/
