@@ -278,8 +278,9 @@ function cleanMarkdownValue(val: string): string {
 }
 
 function parseWorktreeResult(worktreeInfo: string): { worktreePath: string | null; branchName: string | null } {
-  const pathMatch = worktreeInfo.match(/path[^`\n]*`([^`\n]+)`/i) ?? worktreeInfo.match(/(\/[^\s`]*\/worktrees\/[^\s`]+)/);
-  const branchMatch = worktreeInfo.match(/branch[^`\n]*`([^`\n]+)`/i);
+  const pathMatch =
+    worktreeInfo.match(/path[^`\n]*`([^`\n]+)`/i) ?? worktreeInfo.match(/(\/[^\s`]*\/worktrees\/[^\s`]+)/) ?? worktreeInfo.match(/path[:\s]+([^\s`\n]+)/i);
+  const branchMatch = worktreeInfo.match(/branch[^`\n]*`([^`\n]+)`/i) ?? worktreeInfo.match(/branch[^:\n]*:\s*([^\s`\n]+)/i);
 
   const worktreePath = pathMatch ? cleanMarkdownValue(pathMatch[1]) : null;
   const branchName = branchMatch ? cleanMarkdownValue(branchMatch[1]) : null;
