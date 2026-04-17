@@ -80,3 +80,7 @@ export const OUTREACH_DATA_RESULT = "/tmp/claude-code-result-outreach-data.md";
 export const GMAIL_CHANNEL: string = optionalEnv("GMAIL_CHANNEL", "1491111325173022934");
 export const GMAIL_WORKSPACE: string = optionalEnv("GMAIL_WORKSPACE", "/home/ubuntu/.openclaw/workspace-gmail");
 export const GMAIL_RESULT = "/tmp/claude-code-result-gmail.md";
+
+// --- Gemini API (audio transcription) ---
+export const GOOGLE_API_KEY: string = optionalEnv("GOOGLE_API_KEY", "");
+export const GEMINI_TRANSCRIBE_MODEL: string = optionalEnv("GEMINI_TRANSCRIBE_MODEL", "gemini-2.5-flash");
