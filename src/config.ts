@@ -28,6 +28,8 @@ function optionalEnvInt(key: string, fallback: number): number {
 
 // --- Bot config ---
 export const DISCORD_TOKEN: string = requireEnv("DISCORD_TOKEN");
+export const DISCORD_APP_ID: string = optionalEnv("DISCORD_APP_ID", "1492686913025605642");
+export const DISCORD_GUILD_ID: string = optionalEnv("DISCORD_GUILD_ID", "936268439465623563");
 export const PREFIX: string = optionalEnv("PREFIX", "!claude");
 export const ALLOWED_CHANNELS: string[] | null = parseList(process.env.ALLOWED_CHANNELS);
 export const ALLOWED_USERS: string[] | null = parseList(process.env.ALLOWED_USERS);

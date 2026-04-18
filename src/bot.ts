@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, ChannelType, type Message, type ThreadChannel } from "discord.js";
+import { Client, GatewayIntentBits, ChannelType, MessageFlags, type Interaction, type Message, type ThreadChannel } from "discord.js";
 import {
   DISCORD_TOKEN,
   PREFIX,
@@ -20,6 +20,7 @@ import { handleDiscordBot, handleDiscordBotThread } from "./handlers/discord-bot
 import { handleOutreachData } from "./handlers/outreach-data.js";
 import { handleGmail } from "./handlers/gmail.js";
 import { startJobScheduler } from "./jobs/jobs.js";
+import { registerSlashCommands, handleInteraction } from "./slash-commands.js";
 
 let activeJobs = 0;
 let shuttingDown = false;
@@ -30,7 +31,22 @@ const client = new Client({
 
 client.on("ready", () => {
   console.log(`Logged in as ${client.user?.tag ?? "unknown"}`);
+  void registerSlashCommands();
   void startJobScheduler(client);
+});
+
+client.on("interactionCreate", async (interaction: Interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  try {
+    await handleInteraction(interaction);
+  } catch (err) {
+    console.error(`[interaction] ${formatError(err)}`);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply(`Error: ${formatError(err)}`).catch(() => undefined);
+    } else {
+      await interaction.reply({ content: `Error: ${formatError(err)}`, flags: MessageFlags.Ephemeral }).catch(() => undefined);
+    }
+  }
 });
 
 client.on("messageCreate", async (message: Message) => {
