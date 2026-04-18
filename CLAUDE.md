@@ -6,7 +6,7 @@ Discord bot that bridges messages to Claude Code CLI with channel-based routing 
 ## Discord App
 - **App ID:** 1492686913025605642
 - **Public Key:** 4bf54558c82e280bdbdef31929e11c5b43754191f32df44a6b38baa8bf69ad54
-- **Bot Invite URL:** https://discord.com/oauth2/authorize?client_id=1492686913025605642&permissions=2322563698519104&integration_type=0&scope=bot
+- **Bot Invite URL:** https://discord.com/oauth2/authorize?client_id=1492686913025605642&permissions=2322563698519104&integration_type=0&scope=bot+applications.commands
 
 ## Tech Stack
 - **Runtime:** Node.js 20+
