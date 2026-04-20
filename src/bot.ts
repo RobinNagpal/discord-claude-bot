@@ -123,8 +123,8 @@ client.on("messageCreate", async (message: Message) => {
       try {
         const downloaded = await downloadFilesForMessage(message.id, fileAttachments);
         filesSection = formatAttachedFilesSection(downloaded);
-        const ack = downloaded.map((f) => `- \`${f.name}\` → \`${f.path}\``).join("\n");
-        await replyInChunks(message, `**Attached files saved:**\n${ack}`);
+        const ack = downloaded.map((f) => (f.text !== null ? `- \`${f.name}\` — inlined into prompt` : `- \`${f.name}\` — saved at \`${f.path}\``)).join("\n");
+        await replyInChunks(message, `**Attached files:**\n${ack}`);
       } catch (err) {
         await message.reply(`File download failed: ${formatError(err)}`);
         return;
