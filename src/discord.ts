@@ -47,3 +47,17 @@ export function formatError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   return msg.slice(0, 500);
 }
+
+export function formatExecError(err: unknown): string {
+  if (err && typeof err === "object") {
+    const e = err as { message?: string; stderr?: string; stdout?: string };
+    const parts: string[] = [];
+    if (e.message) parts.push(e.message);
+    const stderr = typeof e.stderr === "string" ? e.stderr.trim() : "";
+    if (stderr) parts.push(stderr);
+    const stdout = typeof e.stdout === "string" ? e.stdout.trim() : "";
+    if (stdout) parts.push(stdout);
+    return parts.join("\n").slice(0, 1500);
+  }
+  return String(err).slice(0, 1500);
+}

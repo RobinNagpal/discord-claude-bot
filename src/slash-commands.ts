@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { REST, Routes, SlashCommandBuilder, ChannelType, MessageFlags, type ChatInputCommandInteraction } from "discord.js";
@@ -18,7 +18,7 @@ import {
   DISCORD_BOT_WORKTREE_BASE,
 } from "./config.js";
 import { runClaude } from "./claude.js";
-import { formatError, splitMessage } from "./discord.js";
+import { formatError, formatExecError, splitMessage } from "./discord.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -151,6 +151,54 @@ async function handleListWorktrees(interaction: ChatInputCommandInteraction): Pr
   }
 }
 
+async function removeWorktreeWithFallbacks(mainRepo: string, worktreePath: string): Promise<{ log: string[]; removed: boolean }> {
+  const log: string[] = [];
+
+  try {
+    await runGit(mainRepo, ["worktree", "remove", "--force", worktreePath]);
+    log.push(`Removed worktree \`${worktreePath}\`.`);
+    return { log, removed: true };
+  } catch (err) {
+    log.push(`git worktree remove --force failed:\n${formatExecError(err)}`);
+  }
+
+  try {
+    await runGit(mainRepo, ["worktree", "prune"]);
+    log.push("Ran git worktree prune.");
+  } catch (err) {
+    log.push(`git worktree prune failed:\n${formatExecError(err)}`);
+  }
+
+  try {
+    await runGit(mainRepo, ["worktree", "remove", "--force", worktreePath]);
+    log.push(`Removed worktree \`${worktreePath}\` after prune.`);
+    return { log, removed: true };
+  } catch (err) {
+    log.push(`retry after prune failed:\n${formatExecError(err)}`);
+  }
+
+  if (existsSync(worktreePath)) {
+    try {
+      rmSync(worktreePath, { recursive: true, force: true });
+      log.push(`rm -rf \`${worktreePath}\` succeeded.`);
+    } catch (err) {
+      log.push(`rm -rf failed: ${formatError(err)}`);
+      return { log, removed: false };
+    }
+  } else {
+    log.push("(worktree path does not exist on disk)");
+  }
+
+  try {
+    await runGit(mainRepo, ["worktree", "prune"]);
+    log.push("Pruned stale worktree metadata.");
+    return { log, removed: true };
+  } catch (err) {
+    log.push(`final git worktree prune failed:\n${formatExecError(err)}`);
+    return { log, removed: false };
+  }
+}
+
 async function handleDeleteWorktree(interaction: ChatInputCommandInteraction): Promise<void> {
   const ctx = resolveProjectContext(interaction);
   if (!ctx) {
@@ -169,25 +217,19 @@ async function handleDeleteWorktree(interaction: ChatInputCommandInteraction): P
   const worktreePath = join(ctx.worktreeBase, name);
 
   await interaction.deferReply();
-  const lines: string[] = [];
-  let worktreeRemoved = false;
-  try {
-    const { stdout, stderr } = await runGit(ctx.mainRepo, ["worktree", "remove", "--force", worktreePath]);
-    worktreeRemoved = true;
-    lines.push(`Removed worktree \`${worktreePath}\`.`);
-    if (stdout.trim()) lines.push(stdout.trim());
-    if (stderr.trim()) lines.push(stderr.trim());
-  } catch (err) {
-    lines.push(`Worktree remove failed: ${formatError(err)}`);
-  }
 
-  try {
-    const { stdout, stderr } = await runGit(ctx.mainRepo, ["branch", "-D", name]);
-    lines.push(`Deleted branch \`${name}\`.`);
-    if (stdout.trim()) lines.push(stdout.trim());
-    if (stderr.trim()) lines.push(stderr.trim());
-  } catch (err) {
-    lines.push(`Branch delete failed: ${formatError(err)}`);
+  const { log: worktreeLog, removed: worktreeRemoved } = await removeWorktreeWithFallbacks(ctx.mainRepo, worktreePath);
+  const lines: string[] = [...worktreeLog];
+
+  if (worktreeRemoved) {
+    try {
+      await runGit(ctx.mainRepo, ["branch", "-D", name]);
+      lines.push(`Deleted branch \`${name}\`.`);
+    } catch (err) {
+      lines.push(`Branch delete failed:\n${formatExecError(err)}`);
+    }
+  } else {
+    lines.push(`Skipping branch delete — worktree removal did not complete.`);
   }
 
   const header = worktreeRemoved ? `**delete-worktree ${name}**` : `**delete-worktree ${name}** (failed)`;
