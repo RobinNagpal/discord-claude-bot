@@ -163,8 +163,8 @@ async function removeWorktreeWithFallbacks(mainRepo: string, worktreePath: strin
   }
 
   try {
-    await runGit(mainRepo, ["worktree", "prune"]);
-    log.push("Ran git worktree prune.");
+    await runGit(mainRepo, ["worktree", "prune", "--expire", "now"]);
+    log.push("Ran git worktree prune --expire now.");
   } catch (err) {
     log.push(`git worktree prune failed:\n${formatExecError(err)}`);
   }
@@ -190,13 +190,19 @@ async function removeWorktreeWithFallbacks(mainRepo: string, worktreePath: strin
   }
 
   try {
-    await runGit(mainRepo, ["worktree", "prune"]);
+    await runGit(mainRepo, ["worktree", "prune", "--expire", "now"]);
     log.push("Pruned stale worktree metadata.");
     return { log, removed: true };
   } catch (err) {
     log.push(`final git worktree prune failed:\n${formatExecError(err)}`);
     return { log, removed: false };
   }
+}
+
+function isBranchNotFoundError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const stderr = typeof (err as { stderr?: string }).stderr === "string" ? (err as { stderr: string }).stderr : "";
+  return /branch .* not found/i.test(stderr);
 }
 
 async function handleDeleteWorktree(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -226,7 +232,11 @@ async function handleDeleteWorktree(interaction: ChatInputCommandInteraction): P
       await runGit(ctx.mainRepo, ["branch", "-D", name]);
       lines.push(`Deleted branch \`${name}\`.`);
     } catch (err) {
-      lines.push(`Branch delete failed:\n${formatExecError(err)}`);
+      if (isBranchNotFoundError(err)) {
+        lines.push(`Branch \`${name}\` was already deleted.`);
+      } else {
+        lines.push(`Branch delete failed:\n${formatExecError(err)}`);
+      }
     }
   } else {
     lines.push(`Skipping branch delete — worktree removal did not complete.`);

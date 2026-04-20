@@ -1,3 +1,4 @@
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { Client, GatewayIntentBits, ChannelType, MessageFlags, type Interaction, type Message, type ThreadChannel } from "discord.js";
 import {
   DISCORD_TOKEN,
@@ -22,6 +23,47 @@ import { handleOutreachData } from "./handlers/outreach-data.js";
 import { handleGmail } from "./handlers/gmail.js";
 import { startJobScheduler } from "./jobs/jobs.js";
 import { registerSlashCommands, handleInteraction } from "./slash-commands.js";
+
+const LOCK_FILE = "/tmp/discord-claude-bot.pid";
+
+function isPidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // ESRCH -> no such process (dead). EPERM -> process exists but we can't
+    // signal it (still counts as alive).
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+function acquireSingletonLock(): void {
+  if (existsSync(LOCK_FILE)) {
+    const raw = readFileSync(LOCK_FILE, "utf8").trim();
+    const existing = Number.parseInt(raw, 10);
+    if (isPidAlive(existing) && existing !== process.pid) {
+      console.error(`[startup] another discord-claude-bot instance is already running (pid ${String(existing)}). Exiting.`);
+      process.exit(1);
+    }
+    console.log(`[startup] stale lock file for pid ${raw || "(empty)"} — overwriting.`);
+  }
+  writeFileSync(LOCK_FILE, String(process.pid));
+}
+
+function releaseSingletonLock(): void {
+  try {
+    if (existsSync(LOCK_FILE)) {
+      const raw = readFileSync(LOCK_FILE, "utf8").trim();
+      if (raw && Number.parseInt(raw, 10) !== process.pid) return;
+      unlinkSync(LOCK_FILE);
+    }
+  } catch {
+    // best-effort
+  }
+}
+
+acquireSingletonLock();
 
 let activeJobs = 0;
 let shuttingDown = false;
@@ -179,10 +221,12 @@ async function gracefulShutdown(signal: string): Promise<void> {
   } catch {
     // ignore
   }
+  releaseSingletonLock();
   process.exit(0);
 }
 
 process.on("SIGTERM", () => void gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => void gracefulShutdown("SIGINT"));
+process.on("exit", releaseSingletonLock);
 
 client.login(DISCORD_TOKEN);
