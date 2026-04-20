@@ -228,7 +228,7 @@ RULES:
 - Do NOT run git commands in ${INSIGHTS_UI_MAIN_REPO} (the main repo).
 
 When completely finished with the task:
-1. Run quality checks: yarn lint && yarn prettier-check && yarn build
+1. Run quality checks: yarn lint && yarn prettier-check && yarn compile
 2. Commit all changes
 3. Push: git push -u origin ${branchName}
 4. Create a PR if none exists: gh pr create --base main --head ${branchName} --title "..." --body "..."
@@ -255,7 +255,7 @@ SAFETY CHECK: pwd must contain "/worktrees/", current branch must NOT be main/ma
 
 NEW MESSAGE FROM USER: ${message}
 
-Address the new message in the context of the ongoing task. If it's a clarification, update the plan. If it's a follow-up change, make it. If you make code changes, run quality checks (yarn lint && yarn prettier-check && yarn build), commit, push to origin ${branchName}, and update/create the PR.
+Address the new message in the context of the ongoing task. If it's a clarification, update the plan. If it's a follow-up change, make it. If you make code changes, run quality checks (yarn lint && yarn prettier-check && yarn compile), commit, push to origin ${branchName}, and update/create the PR.
 
 Write your response to ${INSIGHTS_UI_TASK_RESULT}. **Two formats depending on what you did:**
 
