@@ -13,6 +13,7 @@ import {
 } from "./config.js";
 import { formatError, replyInChunks } from "./discord.js";
 import { getAudioAttachments, transcribeAttachments } from "./audio.js";
+import { getNonAudioAttachments, downloadFilesForMessage, formatAttachedFilesSection } from "./files.js";
 import { handleGeneral } from "./handlers/general.js";
 import { handleInsightsUI, handleInsightsUIThread } from "./handlers/insights-ui.js";
 import { handleScrapingLambdas, handleScrapingLambdasThread } from "./handlers/scraping-lambdas.js";
@@ -61,8 +62,11 @@ client.on("messageCreate", async (message: Message) => {
 
   const audioAttachments = inWorktreeThread ? getAudioAttachments(message) : [];
   const hasAudio = audioAttachments.length > 0;
+  const fileAttachments = getNonAudioAttachments(message);
+  const hasFiles = fileAttachments.length > 0;
+  const filesBypassPrefix = inWorktreeThread && hasFiles;
 
-  if (!hasAudio) {
+  if (!hasAudio && !filesBypassPrefix) {
     if (!message.content.startsWith(PREFIX)) return;
     const afterPrefix = message.content.slice(PREFIX.length);
     if (afterPrefix.length > 0 && afterPrefix[0] !== " ") return;
@@ -82,7 +86,7 @@ client.on("messageCreate", async (message: Message) => {
     return;
   }
 
-  if (!hasAudio && !textPrompt) {
+  if (!hasAudio && !hasFiles && !textPrompt) {
     await message.reply(`Please provide a prompt after \`${PREFIX}\`.`);
     return;
   }
@@ -97,7 +101,7 @@ client.on("messageCreate", async (message: Message) => {
   try {
     let prompt = textPrompt;
     if (hasAudio) {
-      await message.reply(`Transcribing ${audioAttachments.length} audio attachment(s)...`);
+      await message.reply(`Transcribing ${String(audioAttachments.length)} audio attachment(s)...`);
       let transcript: string;
       try {
         transcript = await transcribeAttachments(audioAttachments);
@@ -110,7 +114,22 @@ client.on("messageCreate", async (message: Message) => {
         return;
       }
       await replyInChunks(message, `**Transcript:**\n${transcript}`);
-      prompt = [textPrompt, transcript].filter((s) => s.length > 0).join("\n\n");
+      prompt = [prompt, transcript].filter((s) => s.length > 0).join("\n\n");
+    }
+
+    if (hasFiles) {
+      await message.reply(`Downloading ${String(fileAttachments.length)} file attachment(s)...`);
+      let filesSection: string;
+      try {
+        const downloaded = await downloadFilesForMessage(message.id, fileAttachments);
+        filesSection = formatAttachedFilesSection(downloaded);
+        const ack = downloaded.map((f) => (f.text !== null ? `- \`${f.name}\` — inlined into prompt` : `- \`${f.name}\` — saved at \`${f.path}\``)).join("\n");
+        await replyInChunks(message, `**Attached files:**\n${ack}`);
+      } catch (err) {
+        await message.reply(`File download failed: ${formatError(err)}`);
+        return;
+      }
+      prompt = [prompt, filesSection].filter((s) => s.length > 0).join("\n\n");
     }
 
     if (inInsightsUiThread) {
