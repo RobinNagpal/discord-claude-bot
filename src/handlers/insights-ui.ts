@@ -15,7 +15,7 @@ import {
   INSIGHTS_UI_THREAD_LOGS_DIR,
 } from "../config.js";
 import { runClaude } from "../claude.js";
-import { replyInChunks, sendInChunks, formatError } from "../discord.js";
+import { replyInChunks, sendInChunks, formatError, formatClaudeError } from "../discord.js";
 import { readResultFile } from "../result.js";
 
 type RouteDecision =
@@ -390,7 +390,7 @@ async function handleMaintenance(message: Message, taskDescription: string): Pro
   try {
     await runClaude(buildMaintenancePrompt(taskDescription), { cwd: INSIGHTS_UI_MAIN_REPO });
   } catch (err) {
-    const errText = `Maintenance failed: ${formatError(err)}`;
+    const errText = formatClaudeError(err, "Maintenance failed");
     appendChannelExchange("claude", "ClaudeCode", errText);
     await message.reply(errText);
     return;
@@ -407,7 +407,7 @@ async function handleNewTask(message: Message, taskDescription: string): Promise
   try {
     await runClaude(buildWorktreeManagementPrompt(taskDescription), { cwd: INSIGHTS_UI_MAIN_REPO });
   } catch (err) {
-    const errText = `Step 1 failed: ${formatError(err)}`;
+    const errText = formatClaudeError(err, "Step 1 failed");
     appendChannelExchange("claude", "ClaudeCode", errText);
     await message.reply(errText);
     return;
@@ -452,7 +452,7 @@ async function handleNewTask(message: Message, taskDescription: string): Promise
   try {
     await runClaude(buildInitialTaskPrompt(taskDescription, worktreePath, branchName), { cwd: worktreePath });
   } catch (err) {
-    const errText = `Step 2 failed: ${formatError(err)}`;
+    const errText = formatClaudeError(err, "Step 2 failed");
     appendThreadExchange(branchName, "claude", "ClaudeCode", errText);
     await thread.send(errText);
     return;
@@ -526,7 +526,7 @@ export async function handleInsightsUIThread(message: Message, thread: ThreadCha
   try {
     await runClaude(buildFollowupPrompt(userMessage, worktreePath, worktreeName), { cwd: worktreePath, continueSession: true });
   } catch (err) {
-    const errText = `Follow-up failed: ${formatError(err)}`;
+    const errText = formatClaudeError(err, "Follow-up failed");
     appendThreadExchange(worktreeName, "claude", "ClaudeCode", errText);
     await message.reply(errText);
     return;

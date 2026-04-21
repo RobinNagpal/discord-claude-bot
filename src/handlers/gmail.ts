@@ -1,7 +1,7 @@
 import type { Message } from "discord.js";
 import { GMAIL_WORKSPACE, GMAIL_RESULT } from "../config.js";
 import { runClaude } from "../claude.js";
-import { replyInChunks, formatError } from "../discord.js";
+import { replyInChunks, formatClaudeError } from "../discord.js";
 import { readResultFile } from "../result.js";
 
 function detectWorkflow(taskDescription: string): string {
@@ -63,7 +63,7 @@ export async function handleGmail(message: Message, taskDescription: string): Pr
   try {
     await runClaude(prompt, { cwd: GMAIL_WORKSPACE });
   } catch (err) {
-    await message.reply(`Task failed: ${formatError(err)}`);
+    await message.reply(formatClaudeError(err, "Task failed"));
     return;
   }
 

@@ -12,7 +12,7 @@ import {
   OUTREACH_DATA_CHANNEL,
   GMAIL_CHANNEL,
 } from "./config.js";
-import { formatError, replyInChunks } from "./discord.js";
+import { formatError, formatClaudeError, replyInChunks } from "./discord.js";
 import { getAudioAttachments, transcribeAttachments } from "./audio.js";
 import { getNonAudioAttachments, downloadFilesForMessage, formatAttachedFilesSection } from "./files.js";
 import { handleGeneral } from "./handlers/general.js";
@@ -194,7 +194,7 @@ client.on("messageCreate", async (message: Message) => {
       await handleGeneral(message, prompt);
     }
   } catch (err) {
-    await message.reply(`Error: ${formatError(err)}`);
+    await message.reply(formatClaudeError(err, "Error"));
   } finally {
     activeJobs--;
   }
