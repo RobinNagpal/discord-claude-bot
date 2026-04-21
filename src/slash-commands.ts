@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { REST, Routes, SlashCommandBuilder, ChannelType, MessageFlags, type ChatInputCommandInteraction } from "discord.js";
@@ -253,129 +253,109 @@ async function handleDeleteWorktree(interaction: ChatInputCommandInteraction): P
   await sendLong(interaction, `${header}\n\`\`\`\n${lines.join("\n")}\n\`\`\``);
 }
 
-interface CcusageActiveBlock {
-  startTime: string;
-  endTime: string;
-  actualEndTime?: string;
-  isActive: boolean;
-  entries: number;
-  tokenCounts: {
-    inputTokens: number;
-    outputTokens: number;
-    cacheCreationInputTokens: number;
-    cacheReadInputTokens: number;
+interface UsageBucket {
+  utilization: number;
+  resets_at: string | null;
+}
+
+interface UsageResponse {
+  five_hour?: UsageBucket | null;
+  seven_day?: UsageBucket | null;
+  seven_day_opus?: UsageBucket | null;
+  seven_day_sonnet?: UsageBucket | null;
+  extra_usage?: {
+    is_enabled?: boolean;
+    monthly_limit?: number | null;
+    used_credits?: number | null;
+    utilization?: number | null;
+    currency?: string | null;
+  } | null;
+}
+
+interface ClaudeCredentials {
+  claudeAiOauth?: {
+    accessToken?: string;
+    subscriptionType?: string;
+    rateLimitTier?: string;
   };
-  totalTokens: number;
-  costUSD: number;
-  models: string[];
-  projection?: {
-    totalTokens: number;
-    totalCost: number;
-    remainingMinutes: number;
-  };
 }
 
-interface CcusageBlocksJson {
-  blocks: CcusageActiveBlock[];
-}
-
-interface CcusageWeeklyTotals {
-  inputTokens: number;
-  outputTokens: number;
-  cacheCreationTokens: number;
-  cacheReadTokens: number;
-  totalTokens: number;
-  totalCost: number;
-}
-
-interface CcusageWeeklyEntry {
-  week: string;
-  modelsUsed: string[];
-}
-
-interface CcusageWeeklyJson {
-  weekly: CcusageWeeklyEntry[];
-  totals: CcusageWeeklyTotals;
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
-function formatHoursMinutes(totalMinutes: number): string {
-  const h = Math.floor(totalMinutes / 60);
-  const m = Math.floor(totalMinutes % 60);
-  if (h === 0) return `${m}m`;
-  return `${h}h ${m}m`;
-}
-
-function formatModelsSummary(models: string[]): string {
-  const short = models.map((m) => {
-    if (m.includes("opus")) return "Opus";
-    if (m.includes("sonnet")) return "Sonnet";
-    if (m.includes("haiku")) return "Haiku";
-    return m;
+function formatResetTime(iso: string | null | undefined): string {
+  if (!iso) return "unknown";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const now = Date.now();
+  const diffMs = d.getTime() - now;
+  const diffMin = Math.round(diffMs / 60_000);
+  const absMin = Math.abs(diffMin);
+  let relative: string;
+  if (absMin < 60) relative = `${String(absMin)}m`;
+  else if (absMin < 60 * 24) relative = `${String(Math.round(absMin / 60))}h`;
+  else relative = `${String(Math.round(absMin / (60 * 24)))}d`;
+  const when = diffMs >= 0 ? `in ${relative}` : `${relative} ago`;
+  const local = d.toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
   });
-  return [...new Set(short)].join(", ");
+  return `${local} ET (${when})`;
 }
 
-async function runCcusage(args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync("npx", ["-y", "ccusage@latest", ...args], {
-    timeout: 120_000,
-    maxBuffer: 8 * 1024 * 1024,
+function formatBucket(label: string, bucket: UsageBucket | null | undefined): string {
+  if (!bucket || typeof bucket.utilization !== "number") return `${label}: (no data)`;
+  const pct = bucket.utilization.toFixed(1);
+  return `${label}: ${pct}% used, resets ${formatResetTime(bucket.resets_at)}`;
+}
+
+async function fetchClaudeUsage(): Promise<{ data: UsageResponse; plan: string | undefined; tier: string | undefined }> {
+  const credPath = process.env.CLAUDE_CREDENTIALS_PATH ?? join(process.env.HOME ?? "/home/ubuntu", ".claude", ".credentials.json");
+  if (!existsSync(credPath)) {
+    throw new Error(`Claude credentials not found at ${credPath}`);
+  }
+  const raw = readFileSync(credPath, "utf-8");
+  const creds = JSON.parse(raw) as ClaudeCredentials;
+  const token = creds.claudeAiOauth?.accessToken;
+  if (!token) throw new Error("No OAuth access token in credentials file");
+
+  const res = await fetch("https://api.anthropic.com/api/oauth/usage", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "anthropic-beta": "oauth-2025-04-20",
+      "User-Agent": "discord-claude-bot/1.0",
+    },
+    signal: AbortSignal.timeout(10_000),
   });
-  return stdout;
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`HTTP ${String(res.status)}: ${body.slice(0, 500)}`);
+  }
+  const data = (await res.json()) as UsageResponse;
+  return { data, plan: creds.claudeAiOauth?.subscriptionType, tier: creds.claudeAiOauth?.rateLimitTier };
 }
 
 async function handleClaudeCodeUsage(interaction: ChatInputCommandInteraction): Promise<void> {
   await interaction.deferReply();
   try {
-    const sinceDate = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
-    const since = `${String(sinceDate.getUTCFullYear())}${String(sinceDate.getUTCMonth() + 1).padStart(2, "0")}${String(sinceDate.getUTCDate()).padStart(2, "0")}`;
-
-    const [blocksOut, weeklyOut] = await Promise.all([runCcusage(["blocks", "--active", "--json"]), runCcusage(["weekly", "--json", "--since", since])]);
-
-    const blocksJson = JSON.parse(blocksOut) as CcusageBlocksJson;
-    const weeklyJson = JSON.parse(weeklyOut) as CcusageWeeklyJson;
-
+    const { data, plan, tier } = await fetchClaudeUsage();
     const lines: string[] = [];
-
-    const active = blocksJson.blocks.find((b) => b.isActive);
-    if (!active) {
-      lines.push("Session: no active session in the last 5 hours.");
-    } else {
-      const startedLocal = new Date(active.startTime).toLocaleString("en-US", {
-        timeZone: "America/New_York",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
-      const endMs = new Date(active.endTime).getTime();
-      const remainingMin = Math.max(0, Math.floor((endMs - Date.now()) / 60_000));
-      const t = active.tokenCounts;
-      lines.push(`Session (started ${startedLocal} ET, ${formatHoursMinutes(remainingMin)} remaining):`);
-      lines.push(
-        `  tokens: input=${formatTokens(t.inputTokens)}, output=${formatTokens(t.outputTokens)}, cache_read=${formatTokens(t.cacheReadInputTokens)}, cache_creation=${formatTokens(t.cacheCreationInputTokens)}`,
-      );
-      lines.push(`  total:  ${formatTokens(active.totalTokens)} tokens, ~$${active.costUSD.toFixed(2)}`);
-      lines.push(`  models: ${formatModelsSummary(active.models)}`);
-      if (active.projection) {
-        lines.push(`  projected at window end: ${formatTokens(active.projection.totalTokens)} tokens, ~$${active.projection.totalCost.toFixed(2)}`);
-      }
+    if (plan || tier) {
+      const bits = [plan ? `plan=${plan}` : null, tier ? `tier=${tier}` : null].filter((x): x is string => x !== null);
+      lines.push(bits.join(", "));
     }
-
-    const w = weeklyJson.totals;
-    const weekModels = [...new Set(weeklyJson.weekly.flatMap((e) => e.modelsUsed))];
-    lines.push("");
-    lines.push("Week (last 7 days):");
-    lines.push(
-      `  tokens: input=${formatTokens(w.inputTokens)}, output=${formatTokens(w.outputTokens)}, cache_read=${formatTokens(w.cacheReadTokens)}, cache_creation=${formatTokens(w.cacheCreationTokens)}`,
-    );
-    lines.push(`  total:  ${formatTokens(w.totalTokens)} tokens, ~$${w.totalCost.toFixed(2)}`);
-    lines.push(`  models: ${formatModelsSummary(weekModels)}`);
-
+    lines.push(formatBucket("Current 5h session", data.five_hour));
+    lines.push(formatBucket("Current week (all)", data.seven_day));
+    if (data.seven_day_opus) lines.push(formatBucket("Current week (Opus)", data.seven_day_opus));
+    if (data.seven_day_sonnet) lines.push(formatBucket("Current week (Sonnet)", data.seven_day_sonnet));
+    const extra = data.extra_usage;
+    if (extra?.is_enabled && typeof extra.utilization === "number") {
+      lines.push(`Extra usage: ${extra.utilization.toFixed(1)}% used of ${extra.monthly_limit ?? "—"} ${extra.currency ?? ""}`.trim());
+    }
     await sendLong(interaction, `**Claude Code usage**\n\`\`\`\n${lines.join("\n")}\n\`\`\``);
   } catch (err) {
     await interaction.editReply(`claude-code-usage failed: ${formatError(err)}`);
