@@ -11,6 +11,7 @@ import {
   DISCORD_BOT_CHANNEL,
   OUTREACH_DATA_CHANNEL,
   GMAIL_CHANNEL,
+  LOCK_FILE,
 } from "./config.js";
 import { formatError, formatClaudeError, replyInChunks } from "./discord.js";
 import { getAudioAttachments, transcribeAttachments } from "./audio.js";
@@ -23,8 +24,6 @@ import { handleOutreachData } from "./handlers/outreach-data.js";
 import { handleGmail } from "./handlers/gmail.js";
 import { startJobScheduler } from "./jobs/jobs.js";
 import { registerSlashCommands, handleInteraction } from "./slash-commands.js";
-
-const LOCK_FILE = "/tmp/discord-claude-bot.pid";
 
 function isPidAlive(pid: number): boolean {
   if (!Number.isInteger(pid) || pid <= 0) return false;
