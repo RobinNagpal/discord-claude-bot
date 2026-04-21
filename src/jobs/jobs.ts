@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { Client, TextChannel } from "discord.js";
-import type { JobConfig, JobHandler, JobRunResult } from "./types.js";
+import type { JobActiveWindow, JobConfig, JobHandler, JobRunResult } from "./types.js";
 import { runClaude } from "../claude.js";
 import { splitMessage } from "../discord.js";
 
@@ -142,9 +142,39 @@ async function tick(): Promise<void> {
       job.nextRunAt = now + parseCronToNextMs(job.config.schedule.expr);
     }
 
+    if (!isInActiveWindow(job.config.activeWindow, new Date(now))) {
+      continue;
+    }
+
     // Fire and forget — don't block the tick loop
     void executeJob(job);
   }
+}
+
+function isInActiveWindow(window: JobActiveWindow | undefined, now: Date): boolean {
+  if (!window) return true;
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: window.timezone,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+
+  const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "";
+  const rawHour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  const minute = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  const hour = rawHour === 24 ? 0 : rawHour;
+
+  const dow = dayMap[weekday] ?? -1;
+  if (window.daysOfWeek && !window.daysOfWeek.includes(dow)) return false;
+
+  const nowMin = hour * 60 + minute;
+  const startMin = window.startHour * 60 + (window.startMinute ?? 0);
+  const endMin = window.endHour * 60 + (window.endMinute ?? 0);
+  return nowMin >= startMin && nowMin < endMin;
 }
 
 async function executeJob(job: LoadedJob): Promise<void> {
