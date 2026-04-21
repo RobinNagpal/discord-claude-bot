@@ -12,7 +12,7 @@ import {
   INSIGHTS_UI_THREAD_LOGS_DIR,
 } from "../config.js";
 import { runClaude } from "../claude.js";
-import { replyInChunks, formatError } from "../discord.js";
+import { replyInChunks, formatClaudeError } from "../discord.js";
 import { readResultFile } from "../result.js";
 import { type WorktreeChannelConfig, appendThreadExchange, clearResultFiles, handleWorktreeChannelMessage } from "./worktree-channel.js";
 
@@ -88,7 +88,7 @@ export async function handleInsightsUIThread(message: Message, thread: ThreadCha
   try {
     await runClaude(buildFollowupPrompt(userMessage, worktreePath, worktreeName), { cwd: worktreePath, continueSession: true });
   } catch (err) {
-    const errText = `Follow-up failed: ${formatError(err)}`;
+    const errText = formatClaudeError(err, "Follow-up failed");
     appendThreadExchange(CONFIG, worktreeName, "claude", "ClaudeCode", errText);
     await message.reply(errText);
     return;

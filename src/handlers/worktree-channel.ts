@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { ChannelType, type Message, type ThreadChannel } from "discord.js";
 
 import { runClaude } from "../claude.js";
-import { replyInChunks, sendInChunks, formatError } from "../discord.js";
+import { replyInChunks, sendInChunks, formatError, formatClaudeError } from "../discord.js";
 import { readResultFile } from "../result.js";
 
 const execFileAsync = promisify(execFile);
@@ -158,7 +158,7 @@ async function routeRequest(config: WorktreeChannelConfig, userMessage: string):
   try {
     await runClaude(buildRouterPrompt(config, userMessage), { cwd: config.mainRepo });
   } catch (err) {
-    return { command: "router_error", error: formatError(err) };
+    return { command: "router_error", error: formatClaudeError(err, "Routing failed") };
   }
   const raw = readResultFile(config.routeResult);
   const parsed = parseRouteDecision(raw);
@@ -370,7 +370,7 @@ async function handleMaintenance(config: WorktreeChannelConfig, message: Message
   try {
     await runClaude(buildMaintenancePrompt(config, taskDescription), { cwd: config.mainRepo });
   } catch (err) {
-    const errText = `Maintenance failed: ${formatError(err)}`;
+    const errText = formatClaudeError(err, "Maintenance failed");
     appendChannelExchange(config, "claude", "ClaudeCode", errText);
     await message.reply(errText);
     return;
@@ -387,7 +387,7 @@ async function handleNewTask(config: WorktreeChannelConfig, message: Message, ta
   try {
     await runClaude(buildWorktreeManagementPrompt(config, taskDescription), { cwd: config.mainRepo });
   } catch (err) {
-    const errText = `Step 1 failed: ${formatError(err)}`;
+    const errText = formatClaudeError(err, "Step 1 failed");
     appendChannelExchange(config, "claude", "ClaudeCode", errText);
     await message.reply(errText);
     return;
@@ -432,7 +432,7 @@ async function handleNewTask(config: WorktreeChannelConfig, message: Message, ta
   try {
     await runClaude(buildInitialTaskPrompt(config, taskDescription, worktreePath, branchName), { cwd: worktreePath });
   } catch (err) {
-    const errText = `Step 2 failed: ${formatError(err)}`;
+    const errText = formatClaudeError(err, "Step 2 failed");
     appendThreadExchange(config, branchName, "claude", "ClaudeCode", errText);
     await thread.send(errText);
     return;
@@ -451,7 +451,7 @@ export async function handleWorktreeChannelMessage(config: WorktreeChannelConfig
   const decision = await routeRequest(config, userMessage);
 
   if (decision.command === "router_error") {
-    const errText = `Routing failed: ${decision.error}`;
+    const errText = decision.error;
     appendChannelExchange(config, "claude", "ClaudeCode", errText);
     await message.reply(errText);
     return;
