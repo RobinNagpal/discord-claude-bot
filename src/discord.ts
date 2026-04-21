@@ -1,4 +1,5 @@
 import type { Message, ThreadChannel } from "discord.js";
+import { ClaudeRateLimitError } from "./claude.js";
 
 const MAX_DISCORD_LENGTH = 1900;
 
@@ -46,6 +47,13 @@ export async function sendInChunks(thread: ThreadChannel, text: string): Promise
 export function formatError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   return msg.slice(0, 500);
+}
+
+export function formatClaudeError(err: unknown, prefix: string): string {
+  if (err instanceof ClaudeRateLimitError) {
+    return `Claude Code usage limit reached. Please try again once the limit resets.\n\n${err.detail}`.slice(0, 1500);
+  }
+  return `${prefix}: ${formatError(err)}`;
 }
 
 export function formatExecError(err: unknown): string {

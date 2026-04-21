@@ -1,7 +1,7 @@
 import type { Message } from "discord.js";
 import { OUTREACH_DATA_WORKSPACE, OUTREACH_DATA_RESULT } from "../config.js";
 import { runClaude } from "../claude.js";
-import { replyInChunks, formatError } from "../discord.js";
+import { replyInChunks, formatClaudeError } from "../discord.js";
 import { readResultFile } from "../result.js";
 
 function detectCampaignContext(taskDescription: string): string {
@@ -63,7 +63,7 @@ export async function handleOutreachData(message: Message, taskDescription: stri
   try {
     await runClaude(prompt, { cwd: OUTREACH_DATA_WORKSPACE });
   } catch (err) {
-    await message.reply(`Task failed: ${formatError(err)}`);
+    await message.reply(formatClaudeError(err, "Task failed"));
     return;
   }
 

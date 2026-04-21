@@ -18,7 +18,7 @@ import {
   DISCORD_BOT_WORKTREE_BASE,
 } from "./config.js";
 import { runClaude } from "./claude.js";
-import { formatError, formatExecError, splitMessage } from "./discord.js";
+import { formatError, formatClaudeError, formatExecError, splitMessage } from "./discord.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -128,7 +128,7 @@ async function handleCompact(interaction: ChatInputCommandInteraction): Promise<
     if (cleaned && cleaned !== "(no output)") msg += `\n\`\`\`\n${cleaned}\n\`\`\``;
     await sendLong(interaction, msg);
   } catch (err) {
-    await interaction.editReply(`Compact failed: ${formatError(err)}`);
+    await interaction.editReply(formatClaudeError(err, "Compact failed"));
   }
 }
 
