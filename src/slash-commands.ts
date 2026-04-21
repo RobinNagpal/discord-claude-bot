@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { REST, Routes, SlashCommandBuilder, ChannelType, MessageFlags, type ChatInputCommandInteraction } from "discord.js";
@@ -29,6 +29,9 @@ const commands = [
     .setName("delete-worktree")
     .setDescription("Delete a worktree (and its branch) from this project.")
     .addStringOption((opt) => opt.setName("name").setDescription("Worktree/branch name to delete").setRequired(true)),
+  new SlashCommandBuilder()
+    .setName("claude-code-usage")
+    .setDescription("Report Claude Code subscription usage for the current 5-hour session and rolling week."),
 ];
 
 export async function registerSlashCommands(): Promise<void> {
@@ -246,8 +249,63 @@ async function handleDeleteWorktree(interaction: ChatInputCommandInteraction): P
   await sendLong(interaction, `${header}\n\`\`\`\n${lines.join("\n")}\n\`\`\``);
 }
 
+async function handleClaudeCodeUsage(interaction: ChatInputCommandInteraction): Promise<void> {
+  await interaction.deferReply();
+  const resultFile = "/tmp/claude-code-usage-slash.md";
+  try {
+    if (existsSync(resultFile)) rmSync(resultFile, { force: true });
+  } catch {
+    // best-effort cleanup
+  }
+  const prompt = `Produce a Claude Code subscription-usage report and write it to ${resultFile}. Keep it under ~20 lines of plain text, Discord-friendly.
+
+Focus on two windows:
+1. **Current session** — the active 5-hour block (the window Claude Code uses to enforce per-session caps). Anchor it on the earliest assistant turn timestamp in the last 5 hours; if no activity in the last 5 hours, say "no active session".
+2. **Rolling week** — the last 7 days (the window Max plans use for weekly caps).
+
+How to get the data (try in order, stop once one works):
+1. If the \`ccusage\` CLI is installed (\`which ccusage\`), prefer it. \`ccusage blocks --active --json\` gives the current session block with token totals; \`ccusage daily --json --since $(date -u -d '7 days ago' +%Y%m%d)\` gives the last 7 days. Sum the daily entries for the weekly total.
+2. Otherwise, walk \`~/.claude/projects/*/*.jsonl\` and tally token usage from assistant-turn \`usage\` objects. Each JSONL line has a \`timestamp\` (ISO) and, for assistant turns, a \`message.usage\` object with \`input_tokens\`, \`output_tokens\`, \`cache_creation_input_tokens\`, \`cache_read_input_tokens\`, and \`model\`. Filter by timestamp for each window.
+3. If neither data source is available or has zero records, say so in one short line and suggest installing \`ccusage\` — do NOT invent numbers.
+
+For each window, report:
+- Total input / output / cache-read / cache-creation tokens (sum them; don't double-count cache reads as input).
+- Approximate cost in USD, derived from per-model pricing in the usage records if available. If pricing isn't in the data, omit the cost line rather than guessing.
+- Per-model split (Opus / Sonnet / Haiku) by output tokens, as percentages.
+- For the session window only: the session start time (local time, \`America/New_York\`) and how much of the 5-hour window remains.
+
+If you can detect the user's plan tier (Pro / Max 5x / Max 20x) from any hint in the data, show the fraction of the known per-session and weekly caps consumed. If you cannot detect the plan, omit that line rather than guessing — just show the absolute usage.
+
+Output format — plain text, no markdown headings, no preamble, no trailing commentary:
+  Session (started HH:MM ET, N h M m remaining):
+    tokens: input=X, output=Y, cache_read=Z, cache_creation=W
+    cost:   ~$N      (omit if unknown)
+    models: Opus=X%, Sonnet=Y%, Haiku=Z%
+    plan:   P% of <plan> session cap used   (omit line if plan unknown)
+  Week (last 7 days):
+    tokens: input=X, output=Y, cache_read=Z, cache_creation=W
+    cost:   ~$N
+    models: Opus=X%, Sonnet=Y%, Haiku=Z%
+    plan:   P% of <plan> weekly cap used   (omit line if plan unknown)
+
+This output is posted to Discord verbatim. Do not add explanations, caveats, or a summary line after it.`;
+
+  try {
+    await runClaude(prompt);
+    const body = existsSync(resultFile) ? readFileSync(resultFile, "utf-8").trim() : "";
+    if (!body) {
+      await interaction.editReply("claude-code-usage: Claude produced no output (check logs).");
+      return;
+    }
+    await sendLong(interaction, `**Claude Code usage**\n\`\`\`\n${body}\n\`\`\``);
+  } catch (err) {
+    await interaction.editReply(`claude-code-usage failed: ${formatError(err)}`);
+  }
+}
+
 export async function handleInteraction(interaction: ChatInputCommandInteraction): Promise<void> {
   if (interaction.commandName === "compact") await handleCompact(interaction);
   else if (interaction.commandName === "list-worktrees") await handleListWorktrees(interaction);
   else if (interaction.commandName === "delete-worktree") await handleDeleteWorktree(interaction);
+  else if (interaction.commandName === "claude-code-usage") await handleClaudeCodeUsage(interaction);
 }
