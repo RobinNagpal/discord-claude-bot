@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { REST, Routes, SlashCommandBuilder, ChannelType, MessageFlags, type ChatInputCommandInteraction } from "discord.js";
@@ -249,55 +249,130 @@ async function handleDeleteWorktree(interaction: ChatInputCommandInteraction): P
   await sendLong(interaction, `${header}\n\`\`\`\n${lines.join("\n")}\n\`\`\``);
 }
 
+interface CcusageActiveBlock {
+  startTime: string;
+  endTime: string;
+  actualEndTime?: string;
+  isActive: boolean;
+  entries: number;
+  tokenCounts: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationInputTokens: number;
+    cacheReadInputTokens: number;
+  };
+  totalTokens: number;
+  costUSD: number;
+  models: string[];
+  projection?: {
+    totalTokens: number;
+    totalCost: number;
+    remainingMinutes: number;
+  };
+}
+
+interface CcusageBlocksJson {
+  blocks: CcusageActiveBlock[];
+}
+
+interface CcusageWeeklyTotals {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  totalTokens: number;
+  totalCost: number;
+}
+
+interface CcusageWeeklyEntry {
+  week: string;
+  modelsUsed: string[];
+}
+
+interface CcusageWeeklyJson {
+  weekly: CcusageWeeklyEntry[];
+  totals: CcusageWeeklyTotals;
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
+function formatHoursMinutes(totalMinutes: number): string {
+  const h = Math.floor(totalMinutes / 60);
+  const m = Math.floor(totalMinutes % 60);
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
+
+function formatModelsSummary(models: string[]): string {
+  const short = models.map((m) => {
+    if (m.includes("opus")) return "Opus";
+    if (m.includes("sonnet")) return "Sonnet";
+    if (m.includes("haiku")) return "Haiku";
+    return m;
+  });
+  return [...new Set(short)].join(", ");
+}
+
+async function runCcusage(args: string[]): Promise<string> {
+  const { stdout } = await execFileAsync("npx", ["-y", "ccusage@latest", ...args], {
+    timeout: 120_000,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  return stdout;
+}
+
 async function handleClaudeCodeUsage(interaction: ChatInputCommandInteraction): Promise<void> {
   await interaction.deferReply();
-  const resultFile = "/tmp/claude-code-usage-slash.md";
   try {
-    if (existsSync(resultFile)) rmSync(resultFile, { force: true });
-  } catch {
-    // best-effort cleanup
-  }
-  const prompt = `Produce a Claude Code subscription-usage report and write it to ${resultFile}. Keep it under ~20 lines of plain text, Discord-friendly.
+    const sinceDate = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+    const since = `${String(sinceDate.getUTCFullYear())}${String(sinceDate.getUTCMonth() + 1).padStart(2, "0")}${String(sinceDate.getUTCDate()).padStart(2, "0")}`;
 
-Focus on two windows:
-1. **Current session** — the active 5-hour block (the window Claude Code uses to enforce per-session caps). Anchor it on the earliest assistant turn timestamp in the last 5 hours; if no activity in the last 5 hours, say "no active session".
-2. **Rolling week** — the last 7 days (the window Max plans use for weekly caps).
+    const [blocksOut, weeklyOut] = await Promise.all([runCcusage(["blocks", "--active", "--json"]), runCcusage(["weekly", "--json", "--since", since])]);
 
-How to get the data (try in order, stop once one works):
-1. If the \`ccusage\` CLI is installed (\`which ccusage\`), prefer it. \`ccusage blocks --active --json\` gives the current session block with token totals; \`ccusage daily --json --since $(date -u -d '7 days ago' +%Y%m%d)\` gives the last 7 days. Sum the daily entries for the weekly total.
-2. Otherwise, walk \`~/.claude/projects/*/*.jsonl\` and tally token usage from assistant-turn \`usage\` objects. Each JSONL line has a \`timestamp\` (ISO) and, for assistant turns, a \`message.usage\` object with \`input_tokens\`, \`output_tokens\`, \`cache_creation_input_tokens\`, \`cache_read_input_tokens\`, and \`model\`. Filter by timestamp for each window.
-3. If neither data source is available or has zero records, say so in one short line and suggest installing \`ccusage\` — do NOT invent numbers.
+    const blocksJson = JSON.parse(blocksOut) as CcusageBlocksJson;
+    const weeklyJson = JSON.parse(weeklyOut) as CcusageWeeklyJson;
 
-For each window, report:
-- Total input / output / cache-read / cache-creation tokens (sum them; don't double-count cache reads as input).
-- Approximate cost in USD, derived from per-model pricing in the usage records if available. If pricing isn't in the data, omit the cost line rather than guessing.
-- Per-model split (Opus / Sonnet / Haiku) by output tokens, as percentages.
-- For the session window only: the session start time (local time, \`America/New_York\`) and how much of the 5-hour window remains.
+    const lines: string[] = [];
 
-If you can detect the user's plan tier (Pro / Max 5x / Max 20x) from any hint in the data, show the fraction of the known per-session and weekly caps consumed. If you cannot detect the plan, omit that line rather than guessing — just show the absolute usage.
-
-Output format — plain text, no markdown headings, no preamble, no trailing commentary:
-  Session (started HH:MM ET, N h M m remaining):
-    tokens: input=X, output=Y, cache_read=Z, cache_creation=W
-    cost:   ~$N      (omit if unknown)
-    models: Opus=X%, Sonnet=Y%, Haiku=Z%
-    plan:   P% of <plan> session cap used   (omit line if plan unknown)
-  Week (last 7 days):
-    tokens: input=X, output=Y, cache_read=Z, cache_creation=W
-    cost:   ~$N
-    models: Opus=X%, Sonnet=Y%, Haiku=Z%
-    plan:   P% of <plan> weekly cap used   (omit line if plan unknown)
-
-This output is posted to Discord verbatim. Do not add explanations, caveats, or a summary line after it.`;
-
-  try {
-    await runClaude(prompt);
-    const body = existsSync(resultFile) ? readFileSync(resultFile, "utf-8").trim() : "";
-    if (!body) {
-      await interaction.editReply("claude-code-usage: Claude produced no output (check logs).");
-      return;
+    const active = blocksJson.blocks.find((b) => b.isActive);
+    if (!active) {
+      lines.push("Session: no active session in the last 5 hours.");
+    } else {
+      const startedLocal = new Date(active.startTime).toLocaleString("en-US", {
+        timeZone: "America/New_York",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+      const endMs = new Date(active.endTime).getTime();
+      const remainingMin = Math.max(0, Math.floor((endMs - Date.now()) / 60_000));
+      const t = active.tokenCounts;
+      lines.push(`Session (started ${startedLocal} ET, ${formatHoursMinutes(remainingMin)} remaining):`);
+      lines.push(
+        `  tokens: input=${formatTokens(t.inputTokens)}, output=${formatTokens(t.outputTokens)}, cache_read=${formatTokens(t.cacheReadInputTokens)}, cache_creation=${formatTokens(t.cacheCreationInputTokens)}`,
+      );
+      lines.push(`  total:  ${formatTokens(active.totalTokens)} tokens, ~$${active.costUSD.toFixed(2)}`);
+      lines.push(`  models: ${formatModelsSummary(active.models)}`);
+      if (active.projection) {
+        lines.push(`  projected at window end: ${formatTokens(active.projection.totalTokens)} tokens, ~$${active.projection.totalCost.toFixed(2)}`);
+      }
     }
-    await sendLong(interaction, `**Claude Code usage**\n\`\`\`\n${body}\n\`\`\``);
+
+    const w = weeklyJson.totals;
+    const weekModels = [...new Set(weeklyJson.weekly.flatMap((e) => e.modelsUsed))];
+    lines.push("");
+    lines.push("Week (last 7 days):");
+    lines.push(
+      `  tokens: input=${formatTokens(w.inputTokens)}, output=${formatTokens(w.outputTokens)}, cache_read=${formatTokens(w.cacheReadTokens)}, cache_creation=${formatTokens(w.cacheCreationTokens)}`,
+    );
+    lines.push(`  total:  ${formatTokens(w.totalTokens)} tokens, ~$${w.totalCost.toFixed(2)}`);
+    lines.push(`  models: ${formatModelsSummary(weekModels)}`);
+
+    await sendLong(interaction, `**Claude Code usage**\n\`\`\`\n${lines.join("\n")}\n\`\`\``);
   } catch (err) {
     await interaction.editReply(`claude-code-usage failed: ${formatError(err)}`);
   }
