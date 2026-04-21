@@ -40,9 +40,9 @@ const CONFIG: WorktreeChannelConfig = {
   routerProjectDescription: "the discord-claude-bot project (the bot's own codebase)",
   supportedCommandsHelp: SUPPORTED_COMMANDS_HELP,
 
-  qualityChecks: "`npm run typecheck && npm run lint && npm run prettier`",
   initialTaskProjectContext:
     "This is the discord-claude-bot project — a TypeScript Discord bot built with discord.js, ESLint, and Prettier. Read CLAUDE.md at the repo root for full project context, build commands, and architecture details.",
+  initialTaskQualityChecksLine: "Run quality checks: `npm run typecheck && npm run lint && npm run prettier`",
   initialTaskSummaryExample: "Added new channel handler for X project.",
 };
 

@@ -35,8 +35,8 @@ export interface WorktreeChannelConfig {
   routerProjectDescription: string;
   supportedCommandsHelp: string;
 
-  qualityChecks: string;
   initialTaskProjectContext: string;
+  initialTaskQualityChecksLine: string;
   initialTaskSummaryExample: string;
 }
 
@@ -231,7 +231,7 @@ RULES:
 - Do NOT run git commands in ${config.mainRepo} (the main repo).
 
 When completely finished with the task:
-1. Run quality checks: ${config.qualityChecks}
+1. ${config.initialTaskQualityChecksLine}
 2. Commit all changes
 3. Push: git push -u origin ${branchName}
 4. Create a PR if none exists: gh pr create --base main --head ${branchName} --title "..." --body "..."
