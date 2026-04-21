@@ -86,3 +86,7 @@ export const GMAIL_RESULT = "/tmp/claude-code-result-gmail.md";
 // --- Gemini API (audio transcription) ---
 export const GOOGLE_API_KEY: string = optionalEnv("GOOGLE_API_KEY", "");
 export const GEMINI_TRANSCRIBE_MODEL: string = optionalEnv("GEMINI_TRANSCRIBE_MODEL", "gemini-2.5-flash");
+
+// --- Self-update (pull + restart) ---
+export const DEPLOYMENT_REPO: string = optionalEnv("DEPLOYMENT_REPO", "/home/ubuntu/discord-claude-bot");
+export const DEPLOYMENT_SERVICE: string = optionalEnv("DEPLOYMENT_SERVICE", "discord-claude-bot");

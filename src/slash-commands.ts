@@ -1,9 +1,12 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { REST, Routes, SlashCommandBuilder, ChannelType, MessageFlags, type ChatInputCommandInteraction } from "discord.js";
 import {
+  ALLOWED_USERS,
+  DEPLOYMENT_REPO,
+  DEPLOYMENT_SERVICE,
   DISCORD_APP_ID,
   DISCORD_GUILD_ID,
   DISCORD_TOKEN,
@@ -32,6 +35,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName("claude-code-usage")
     .setDescription("Report Claude Code subscription usage for the current 5-hour session and rolling week."),
+  new SlashCommandBuilder().setName("pull-bot-and-restart").setDescription("Pull the latest bot code from main, rebuild, and restart the systemd service."),
 ];
 
 export async function registerSlashCommands(): Promise<void> {
@@ -378,9 +382,60 @@ async function handleClaudeCodeUsage(interaction: ChatInputCommandInteraction): 
   }
 }
 
+async function handlePullBotAndRestart(interaction: ChatInputCommandInteraction): Promise<void> {
+  if (ALLOWED_USERS && !ALLOWED_USERS.includes(interaction.user.id)) {
+    await interaction.reply({ content: "You are not authorized to restart the bot.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  await interaction.deferReply();
+
+  const lines: string[] = [];
+  const repo = DEPLOYMENT_REPO;
+  const service = DEPLOYMENT_SERVICE;
+
+  try {
+    const fetch = await runGit(repo, ["fetch", "origin", "main"]);
+    const fetchOut = `${fetch.stdout}${fetch.stderr}`.trim();
+    lines.push(`$ git fetch origin main\n${fetchOut || "(up to date)"}`);
+  } catch (err) {
+    await interaction.editReply(`fetch failed:\n${formatExecError(err)}`);
+    return;
+  }
+
+  let pullOut: string;
+  try {
+    const pull = await runGit(repo, ["pull", "--ff-only", "origin", "main"]);
+    pullOut = `${pull.stdout}${pull.stderr}`.trim();
+    lines.push(`$ git pull --ff-only origin main\n${pullOut || "(already up to date)"}`);
+  } catch (err) {
+    await interaction.editReply(`pull failed:\n${formatExecError(err)}`);
+    return;
+  }
+
+  try {
+    const build = await execFileAsync("npm", ["run", "build"], { cwd: repo, timeout: 300_000, maxBuffer: 8 * 1024 * 1024 });
+    const buildTail = `${build.stdout}${build.stderr}`.trim().split("\n").slice(-5).join("\n");
+    lines.push(`$ npm run build\n${buildTail || "(ok)"}`);
+  } catch (err) {
+    await interaction.editReply(`build failed:\n${formatExecError(err)}`);
+    return;
+  }
+
+  lines.push(`\nRestarting \`${service}\`…`);
+  await sendLong(interaction, `**pull-bot-and-restart**\n\`\`\`\n${lines.join("\n\n")}\n\`\`\``);
+
+  // Fire-and-forget: spawn detached so systemctl's SIGTERM to us doesn't
+  // kill the restart command mid-flight. unref() lets the parent exit
+  // cleanly when systemd signals it.
+  const child = spawn("systemctl", ["--user", "restart", service], { detached: true, stdio: "ignore" });
+  child.unref();
+}
+
 export async function handleInteraction(interaction: ChatInputCommandInteraction): Promise<void> {
   if (interaction.commandName === "compact") await handleCompact(interaction);
   else if (interaction.commandName === "list-worktrees") await handleListWorktrees(interaction);
   else if (interaction.commandName === "delete-worktree") await handleDeleteWorktree(interaction);
   else if (interaction.commandName === "claude-code-usage") await handleClaudeCodeUsage(interaction);
+  else if (interaction.commandName === "pull-bot-and-restart") await handlePullBotAndRestart(interaction);
 }

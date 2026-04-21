@@ -17,12 +17,13 @@ How the bot defines, registers, and dispatches Discord slash commands — and ho
 
 Currently defined commands (all implemented in `src/slash-commands.ts`):
 
-| Command               | Purpose                                                            |
-| --------------------- | ------------------------------------------------------------------ |
-| `/compact`            | Compact the Claude session for the current worktree thread.        |
-| `/list-worktrees`     | List git worktrees for the channel's project.                      |
-| `/delete-worktree`    | Remove a worktree and its branch (with a `name` string option).    |
-| `/claude-code-usage`  | Report Claude Code subscription usage for the current session and rolling week. Runs in any channel/thread. |
+| Command                  | Purpose                                                            |
+| ------------------------ | ------------------------------------------------------------------ |
+| `/compact`               | Compact the Claude session for the current worktree thread.        |
+| `/list-worktrees`        | List git worktrees for the channel's project.                      |
+| `/delete-worktree`       | Remove a worktree and its branch (with a `name` string option).    |
+| `/claude-code-usage`     | Report Claude Code subscription usage for the current session and rolling week. Runs in any channel/thread. |
+| `/pull-bot-and-restart`  | Fetch latest `main` into the deployment repo, rebuild, and restart the systemd service. Gated by `ALLOWED_USERS`. |
 
 ## Registration lifecycle
 
