@@ -16,6 +16,15 @@ export interface JobDiscordConfig {
   notify: boolean;
 }
 
+export interface JobActiveWindow {
+  timezone: string;
+  daysOfWeek?: number[];
+  startHour: number;
+  startMinute?: number;
+  endHour: number;
+  endMinute?: number;
+}
+
 export interface JobConfig {
   name: string;
   enabled: boolean;
@@ -24,6 +33,7 @@ export interface JobConfig {
   workspace: string;
   resultFile: string;
   discord: JobDiscordConfig;
+  activeWindow?: JobActiveWindow;
 }
 
 export interface JobRunResult {

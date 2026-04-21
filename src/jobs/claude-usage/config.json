@@ -1,0 +1,21 @@
+{
+  "name": "Claude Code usage report",
+  "enabled": true,
+  "description": "Post a Claude Code usage summary every 30 minutes on weekdays between 06:00 and 15:00 America/New_York",
+  "schedule": {
+    "kind": "every",
+    "everyMs": 1800000
+  },
+  "activeWindow": {
+    "timezone": "America/New_York",
+    "daysOfWeek": [1, 2, 3, 4, 5],
+    "startHour": 6,
+    "endHour": 15
+  },
+  "workspace": "/home/ubuntu/discord-claude-bot",
+  "resultFile": "/tmp/claude-code-usage-report.md",
+  "discord": {
+    "channelId": "1496162780229796000",
+    "notify": true
+  }
+}
