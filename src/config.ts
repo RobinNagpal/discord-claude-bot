@@ -90,3 +90,4 @@ export const GEMINI_TRANSCRIBE_MODEL: string = optionalEnv("GEMINI_TRANSCRIBE_MO
 // --- Self-update (pull + restart) ---
 export const DEPLOYMENT_REPO: string = optionalEnv("DEPLOYMENT_REPO", "/home/ubuntu/discord-claude-bot");
 export const DEPLOYMENT_SERVICE: string = optionalEnv("DEPLOYMENT_SERVICE", "discord-claude-bot");
+export const LOCK_FILE: string = optionalEnv("LOCK_FILE", "/tmp/discord-claude-bot.pid");

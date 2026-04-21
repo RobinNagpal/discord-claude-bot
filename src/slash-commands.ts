@@ -10,6 +10,7 @@ import {
   DISCORD_APP_ID,
   DISCORD_GUILD_ID,
   DISCORD_TOKEN,
+  LOCK_FILE,
   INSIGHTS_UI_CHANNEL,
   INSIGHTS_UI_MAIN_REPO,
   INSIGHTS_UI_WORKTREE_BASE,
@@ -404,6 +405,17 @@ async function handlePullBotAndRestart(interaction: ChatInputCommandInteraction)
 
   lines.push(`\nRestarting \`${service}\`…`);
   await sendLong(interaction, `**pull-bot-and-restart**\n\`\`\`\n${lines.join("\n\n")}\n\`\`\``);
+
+  // Belt-and-suspenders: gracefulShutdown's exit hook normally clears this,
+  // but if shutdown is interrupted (SIGKILL after TimeoutStopSec, reparent
+  // to init, crash mid-drain) the stale lock pins systemd's auto-restart
+  // loop into the acquireSingletonLock bailout. Clearing it here means the
+  // next bot to start sees a clean slate.
+  try {
+    rmSync(LOCK_FILE, { force: true });
+  } catch {
+    // best-effort
+  }
 
   // Fire-and-forget: spawn detached so systemctl's SIGTERM to us doesn't
   // kill the restart command mid-flight. unref() lets the parent exit
