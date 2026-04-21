@@ -113,3 +113,13 @@ All handlers call `runClaude(prompt, { cwd })` which uses `child_process.execFil
 2. Create `src/jobs/<group>/<job-name>/handler.ts` exporting a default `JobHandler` with `buildPrompt(config)`
 3. The scheduler discovers it automatically on next startup
 4. Set `"enabled": true` in config.json to activate
+
+## Knowledge Base
+Long-form, reference-style documentation about subsystems and patterns lives in [`knowledge/`](knowledge/). See [`knowledge/index.md`](knowledge/index.md) for the full index.
+
+- **Before** doing non-trivial work on a subsystem, skim the relevant knowledge file.
+- **When** you learn something non-obvious about how a part of the system works, add or update a file in `knowledge/` and update `knowledge/index.md`.
+- Keep `CLAUDE.md` focused on high-level overview and quick-reference rules; put the detailed "how X works" writeups in `knowledge/`.
+
+Current topics:
+- [`knowledge/discord-slash-commands.md`](knowledge/discord-slash-commands.md) — How slash commands are defined, registered, and dispatched; recipe for adding a new one.
