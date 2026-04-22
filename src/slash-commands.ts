@@ -341,6 +341,7 @@ async function fetchClaudeUsage(): Promise<{ data: UsageResponse; plan: string |
 }
 
 async function handleClaudeCodeUsage(interaction: ChatInputCommandInteraction): Promise<void> {
+  console.log(`[claude-code-usage] invoked by ${interaction.user.tag} (${interaction.user.id})`);
   await interaction.deferReply();
   try {
     const { data, plan, tier } = await fetchClaudeUsage();
@@ -357,8 +358,10 @@ async function handleClaudeCodeUsage(interaction: ChatInputCommandInteraction): 
     if (extra?.is_enabled && typeof extra.utilization === "number") {
       lines.push(`Extra usage: ${extra.utilization.toFixed(1)}% used of ${extra.monthly_limit ?? "—"} ${extra.currency ?? ""}`.trim());
     }
+    console.log(`[claude-code-usage] success: ${lines.length} lines`);
     await sendLong(interaction, `**Claude Code usage**\n\`\`\`\n${lines.join("\n")}\n\`\`\``);
   } catch (err) {
+    console.error(`[claude-code-usage] failed: ${formatError(err)}`);
     await interaction.editReply(`claude-code-usage failed: ${formatError(err)}`);
   }
 }
