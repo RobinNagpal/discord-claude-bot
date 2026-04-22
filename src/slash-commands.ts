@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { REST, Routes, SlashCommandBuilder, ChannelType, MessageFlags, type ChatInputCommandInteraction } from "discord.js";
@@ -36,6 +36,22 @@ const commands = [
   new SlashCommandBuilder()
     .setName("claude-code-usage")
     .setDescription("Report Claude Code subscription usage for the current 5-hour session and rolling week."),
+  new SlashCommandBuilder()
+    .setName("claude-code-effort")
+    .setDescription("Change the default Claude Code effort level for future sessions.")
+    .addStringOption((opt) =>
+      opt
+        .setName("level")
+        .setDescription("Effort level to switch to.")
+        .setRequired(true)
+        .addChoices(
+          { name: "low", value: "low" },
+          { name: "medium", value: "medium" },
+          { name: "high", value: "high" },
+          { name: "xhigh", value: "xhigh" },
+          { name: "auto (reset to model default)", value: "auto" },
+        ),
+    ),
   new SlashCommandBuilder().setName("pull-bot-and-restart").setDescription("Pull the latest bot code from main, rebuild, and restart the systemd service."),
 ];
 
@@ -281,6 +297,58 @@ interface ClaudeCredentials {
   };
 }
 
+// Claude Code persists only these levels in settings.json (its schema rejects
+// "max" — that's CLI-session-only). "auto" is our sentinel for clearing the
+// override and letting Claude fall back to the model default.
+const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "auto"] as const;
+type EffortLevel = Exclude<(typeof EFFORT_LEVELS)[number], "auto">;
+
+interface ClaudeSettings {
+  effortLevel?: string;
+  [key: string]: unknown;
+}
+
+function getSettingsPath(): string {
+  return process.env.CLAUDE_SETTINGS_PATH ?? join(process.env.HOME ?? "/home/ubuntu", ".claude", "settings.json");
+}
+
+function readClaudeSettings(): { settings: ClaudeSettings; path: string; existed: boolean } {
+  const path = getSettingsPath();
+  if (!existsSync(path)) return { settings: {}, path, existed: false };
+  try {
+    const raw = readFileSync(path, "utf-8");
+    if (!raw.trim()) return { settings: {}, path, existed: true };
+    const parsed = JSON.parse(raw) as ClaudeSettings;
+    return { settings: parsed, path, existed: true };
+  } catch {
+    return { settings: {}, path, existed: true };
+  }
+}
+
+interface EffortStatus {
+  level: string;
+  source: "env" | "settings" | "default";
+  envOverride: string | null;
+}
+
+// CLAUDE_CODE_EFFORT_LEVEL env var takes precedence over settings.json; if
+// neither is set Claude falls back to the per-model default.
+function getCurrentEffort(): EffortStatus {
+  const envLevel = process.env.CLAUDE_CODE_EFFORT_LEVEL?.trim();
+  if (envLevel) return { level: envLevel, source: "env", envOverride: envLevel };
+  const { settings } = readClaudeSettings();
+  if (typeof settings.effortLevel === "string" && settings.effortLevel.trim() !== "") {
+    return { level: settings.effortLevel, source: "settings", envOverride: null };
+  }
+  return { level: "auto (model default)", source: "default", envOverride: null };
+}
+
+function describeEffortSource(status: EffortStatus): string {
+  if (status.source === "env") return "CLAUDE_CODE_EFFORT_LEVEL env var";
+  if (status.source === "settings") return getSettingsPath();
+  return "model default";
+}
+
 function formatResetTime(iso: string | null | undefined): string {
   if (!iso) return "unknown";
   const d = new Date(iso);
@@ -358,11 +426,46 @@ async function handleClaudeCodeUsage(interaction: ChatInputCommandInteraction): 
     if (extra?.is_enabled && typeof extra.utilization === "number") {
       lines.push(`Extra usage: ${extra.utilization.toFixed(1)}% used of ${extra.monthly_limit ?? "—"} ${extra.currency ?? ""}`.trim());
     }
+    const effort = getCurrentEffort();
+    lines.push(`Effort level: ${effort.level} (source: ${describeEffortSource(effort)})`);
     console.log(`[claude-code-usage] success: ${lines.length} lines`);
     await sendLong(interaction, `**Claude Code usage**\n\`\`\`\n${lines.join("\n")}\n\`\`\``);
   } catch (err) {
     console.error(`[claude-code-usage] failed: ${formatError(err)}`);
     await interaction.editReply(`claude-code-usage failed: ${formatError(err)}`);
+  }
+}
+
+async function handleClaudeCodeEffort(interaction: ChatInputCommandInteraction): Promise<void> {
+  const raw = interaction.options.getString("level", true).trim();
+  const level = raw.toLowerCase();
+  if (!(EFFORT_LEVELS as readonly string[]).includes(level)) {
+    await interaction.reply({
+      content: `Invalid effort level \`${raw}\`. Valid levels: ${EFFORT_LEVELS.join(", ")}.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  console.log(`[claude-code-effort] invoked by ${interaction.user.tag} (${interaction.user.id}) -> ${level}`);
+  await interaction.deferReply();
+  try {
+    const { settings, path } = readClaudeSettings();
+    const previous = typeof settings.effortLevel === "string" ? settings.effortLevel : "(unset)";
+    if (level === "auto") delete settings.effortLevel;
+    else settings.effortLevel = level as EffortLevel;
+    writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf-8");
+
+    const shown = level === "auto" ? "auto (model default)" : level;
+    const lines = [`Claude Code effort level: \`${previous}\` -> \`${shown}\``, `Wrote \`${path}\`.`, "Applies to new Claude Code sessions."];
+    const envOverride = process.env.CLAUDE_CODE_EFFORT_LEVEL?.trim();
+    if (envOverride) {
+      lines.push(`Warning: CLAUDE_CODE_EFFORT_LEVEL=\`${envOverride}\` is set in the bot's environment and overrides settings.json.`);
+    }
+    console.log(`[claude-code-effort] success: ${previous} -> ${level}`);
+    await interaction.editReply(lines.join("\n"));
+  } catch (err) {
+    console.error(`[claude-code-effort] failed: ${formatError(err)}`);
+    await interaction.editReply(`claude-code-effort failed: ${formatError(err)}`);
   }
 }
 
@@ -432,5 +535,6 @@ export async function handleInteraction(interaction: ChatInputCommandInteraction
   else if (interaction.commandName === "list-worktrees") await handleListWorktrees(interaction);
   else if (interaction.commandName === "delete-worktree") await handleDeleteWorktree(interaction);
   else if (interaction.commandName === "claude-code-usage") await handleClaudeCodeUsage(interaction);
+  else if (interaction.commandName === "claude-code-effort") await handleClaudeCodeEffort(interaction);
   else if (interaction.commandName === "pull-bot-and-restart") await handlePullBotAndRestart(interaction);
 }
