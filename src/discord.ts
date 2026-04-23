@@ -2,6 +2,13 @@ import type { Message, ThreadChannel } from "discord.js";
 import { ClaudeRateLimitError } from "./claude.js";
 
 const MAX_DISCORD_LENGTH = 1900;
+const DEFAULT_PREVIEW_LENGTH = 1500;
+
+export function truncateForPreview(text: string, max: number = DEFAULT_PREVIEW_LENGTH): string {
+  if (text.length <= max) return text;
+  const omitted = text.length - max;
+  return `${text.slice(0, max)}\n…[truncated ${String(omitted)} chars]`;
+}
 
 export function splitMessage(text: string): string[] {
   const chunks: string[] = [];

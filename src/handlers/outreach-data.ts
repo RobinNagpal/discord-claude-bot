@@ -1,7 +1,7 @@
 import type { Message } from "discord.js";
 import { OUTREACH_DATA_WORKSPACE, OUTREACH_DATA_RESULT } from "../config.js";
 import { runClaude } from "../claude.js";
-import { replyInChunks, formatClaudeError } from "../discord.js";
+import { replyInChunks, formatClaudeError, truncateForPreview } from "../discord.js";
 import { readResultFile } from "../result.js";
 
 function detectCampaignContext(taskDescription: string): string {
@@ -55,7 +55,7 @@ When completely finished:
 }
 
 export async function handleOutreachData(message: Message, taskDescription: string): Promise<void> {
-  await message.reply(`Working on outreach-data task...\n**Task:** ${taskDescription}`);
+  await message.reply(`Working on outreach-data task...\n**Task:** ${truncateForPreview(taskDescription)}`);
 
   const campaignContext = detectCampaignContext(taskDescription);
   const prompt = buildOutreachPrompt(taskDescription, campaignContext);

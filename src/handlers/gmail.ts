@@ -1,7 +1,7 @@
 import type { Message } from "discord.js";
 import { GMAIL_WORKSPACE, GMAIL_RESULT } from "../config.js";
 import { runClaude } from "../claude.js";
-import { replyInChunks, formatClaudeError } from "../discord.js";
+import { replyInChunks, formatClaudeError, truncateForPreview } from "../discord.js";
 import { readResultFile } from "../result.js";
 
 function detectWorkflow(taskDescription: string): string {
@@ -55,7 +55,7 @@ When completely finished:
 }
 
 export async function handleGmail(message: Message, taskDescription: string): Promise<void> {
-  await message.reply(`Working on Gmail task...\n**Task:** ${taskDescription}`);
+  await message.reply(`Working on Gmail task...\n**Task:** ${truncateForPreview(taskDescription)}`);
 
   const workflowContext = detectWorkflow(taskDescription);
   const prompt = buildGmailPrompt(taskDescription, workflowContext);

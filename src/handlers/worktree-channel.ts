@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { ChannelType, type Message, type ThreadChannel } from "discord.js";
 
 import { runClaude } from "../claude.js";
-import { replyInChunks, sendInChunks, formatError, formatClaudeError } from "../discord.js";
+import { replyInChunks, sendInChunks, formatError, formatClaudeError, truncateForPreview } from "../discord.js";
 import { readResultFile } from "../result.js";
 
 const execFileAsync = promisify(execFile);
@@ -366,7 +366,7 @@ async function handleClosePr(config: WorktreeChannelConfig, message: Message, pr
 
 async function handleMaintenance(config: WorktreeChannelConfig, message: Message, taskDescription: string): Promise<void> {
   clearResultFiles(config);
-  await message.reply(`Running maintenance task...\n**Task:** ${taskDescription}`);
+  await message.reply(`Running maintenance task...\n**Task:** ${truncateForPreview(taskDescription)}`);
   try {
     await runClaude(buildMaintenancePrompt(config, taskDescription), { cwd: config.mainRepo });
   } catch (err) {
@@ -382,7 +382,7 @@ async function handleMaintenance(config: WorktreeChannelConfig, message: Message
 
 async function handleNewTask(config: WorktreeChannelConfig, message: Message, taskDescription: string): Promise<void> {
   clearResultFiles(config);
-  await message.reply(`Starting new ${config.startTaskLabel} task...\n**Task:** ${taskDescription}\n\n**Step 1/2:** Managing worktrees...`);
+  await message.reply(`Starting new ${config.startTaskLabel} task...\n**Task:** ${truncateForPreview(taskDescription)}\n\n**Step 1/2:** Managing worktrees...`);
 
   try {
     await runClaude(buildWorktreeManagementPrompt(config, taskDescription), { cwd: config.mainRepo });
@@ -423,8 +423,8 @@ async function handleNewTask(config: WorktreeChannelConfig, message: Message, ta
     return;
   }
 
-  const kickoffMessage = `**Task:** ${taskDescription}\n**Worktree:** \`${worktreePath}\`\n**Branch:** \`${branchName}\`\n\nStarting work — follow up in this thread to continue the conversation.`;
-  await thread.send(kickoffMessage);
+  const kickoffMessage = `**Task:** ${truncateForPreview(taskDescription)}\n**Worktree:** \`${worktreePath}\`\n**Branch:** \`${branchName}\`\n\nStarting work — follow up in this thread to continue the conversation.`;
+  await sendInChunks(thread, kickoffMessage);
   appendThreadExchange(config, branchName, "claude", "ClaudeCode", `[thread created]\n\n${kickoffMessage}`);
   appendThreadExchange(config, branchName, "user", message.author.username, taskDescription);
   appendChannelExchange(config, "claude", "ClaudeCode", `Created thread \`${threadName}\` for branch \`${branchName}\``);
