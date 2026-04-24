@@ -52,6 +52,21 @@ const commands = [
           { name: "auto (reset to model default)", value: "auto" },
         ),
     ),
+  new SlashCommandBuilder()
+    .setName("claude-code-model")
+    .setDescription("Change the default Claude Code model for future sessions.")
+    .addStringOption((opt) =>
+      opt
+        .setName("model")
+        .setDescription("Model to switch to.")
+        .setRequired(true)
+        .addChoices(
+          { name: "opus", value: "opus" },
+          { name: "sonnet", value: "sonnet" },
+          { name: "haiku", value: "haiku" },
+          { name: "default (reset to Claude Code default)", value: "default" },
+        ),
+    ),
   new SlashCommandBuilder().setName("pull-bot-and-restart").setDescription("Pull the latest bot code from main, rebuild, and restart the systemd service."),
 ];
 
@@ -303,8 +318,16 @@ interface ClaudeCredentials {
 const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "auto"] as const;
 type EffortLevel = Exclude<(typeof EFFORT_LEVELS)[number], "auto">;
 
+// Claude Code stores the default model under the "model" key in settings.json.
+// Values are aliases (e.g. "opus", "sonnet", "haiku") or full model names like
+// "claude-sonnet-4-6". "default" is our sentinel for clearing the override so
+// Claude Code falls back to its built-in default.
+const MODEL_CHOICES = ["opus", "sonnet", "haiku", "default"] as const;
+type ModelChoice = Exclude<(typeof MODEL_CHOICES)[number], "default">;
+
 interface ClaudeSettings {
   effortLevel?: string;
+  model?: string;
   [key: string]: unknown;
 }
 
@@ -469,6 +492,39 @@ async function handleClaudeCodeEffort(interaction: ChatInputCommandInteraction):
   }
 }
 
+async function handleClaudeCodeModel(interaction: ChatInputCommandInteraction): Promise<void> {
+  const raw = interaction.options.getString("model", true).trim();
+  const choice = raw.toLowerCase();
+  if (!(MODEL_CHOICES as readonly string[]).includes(choice)) {
+    await interaction.reply({
+      content: `Invalid model \`${raw}\`. Valid choices: ${MODEL_CHOICES.join(", ")}.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  console.log(`[claude-code-model] invoked by ${interaction.user.tag} (${interaction.user.id}) -> ${choice}`);
+  await interaction.deferReply();
+  try {
+    const { settings, path } = readClaudeSettings();
+    const previous = typeof settings.model === "string" ? settings.model : "(unset)";
+    if (choice === "default") delete settings.model;
+    else settings.model = choice as ModelChoice;
+    writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf-8");
+
+    const shown = choice === "default" ? "default (Claude Code default)" : choice;
+    const lines = [`Claude Code model: \`${previous}\` -> \`${shown}\``, `Wrote \`${path}\`.`, "Applies to new Claude Code sessions."];
+    const envOverride = process.env.ANTHROPIC_MODEL?.trim();
+    if (envOverride) {
+      lines.push(`Warning: ANTHROPIC_MODEL=\`${envOverride}\` is set in the bot's environment and overrides settings.json.`);
+    }
+    console.log(`[claude-code-model] success: ${previous} -> ${choice}`);
+    await interaction.editReply(lines.join("\n"));
+  } catch (err) {
+    console.error(`[claude-code-model] failed: ${formatError(err)}`);
+    await interaction.editReply(`claude-code-model failed: ${formatError(err)}`);
+  }
+}
+
 async function handlePullBotAndRestart(interaction: ChatInputCommandInteraction): Promise<void> {
   if (ALLOWED_USERS && !ALLOWED_USERS.includes(interaction.user.id)) {
     await interaction.reply({ content: "You are not authorized to restart the bot.", flags: MessageFlags.Ephemeral });
@@ -536,5 +592,6 @@ export async function handleInteraction(interaction: ChatInputCommandInteraction
   else if (interaction.commandName === "delete-worktree") await handleDeleteWorktree(interaction);
   else if (interaction.commandName === "claude-code-usage") await handleClaudeCodeUsage(interaction);
   else if (interaction.commandName === "claude-code-effort") await handleClaudeCodeEffort(interaction);
+  else if (interaction.commandName === "claude-code-model") await handleClaudeCodeModel(interaction);
   else if (interaction.commandName === "pull-bot-and-restart") await handlePullBotAndRestart(interaction);
 }

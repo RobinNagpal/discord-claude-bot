@@ -15,6 +15,7 @@ This folder collects durable, reference-style knowledge about the discord-claude
 
 ### Discord integration
 - [discord-slash-commands.md](discord-slash-commands.md) — How `/compact`, `/list-worktrees`, and `/delete-worktree` are defined, registered with Discord, and dispatched at runtime. Includes the step-by-step recipe for adding a new slash command.
+- [claude-code-model-command.md](claude-code-model-command.md) — How `/claude-code-model` switches the default Claude Code model by writing `~/.claude/settings.json`, and the precedence rules around `ANTHROPIC_MODEL`.
 
 ### Claude CLI integration
 - [claude-subprocess-errors.md](claude-subprocess-errors.md) — How `runClaude` invokes the Claude CLI, why stdin is closed immediately, how rate-limit errors are detected (`ClaudeRateLimitError`), and how `formatClaudeError` surfaces them to users.
