@@ -372,6 +372,30 @@ function describeEffortSource(status: EffortStatus): string {
   return "model default";
 }
 
+interface ModelStatus {
+  model: string;
+  source: "env" | "settings" | "default";
+  envOverride: string | null;
+}
+
+// ANTHROPIC_MODEL env var takes precedence over settings.json; if neither is
+// set Claude Code falls back to its built-in default.
+function getCurrentModel(): ModelStatus {
+  const envModel = process.env.ANTHROPIC_MODEL?.trim();
+  if (envModel) return { model: envModel, source: "env", envOverride: envModel };
+  const { settings } = readClaudeSettings();
+  if (typeof settings.model === "string" && settings.model.trim() !== "") {
+    return { model: settings.model, source: "settings", envOverride: null };
+  }
+  return { model: "default (Claude Code default)", source: "default", envOverride: null };
+}
+
+function describeModelSource(status: ModelStatus): string {
+  if (status.source === "env") return "ANTHROPIC_MODEL env var";
+  if (status.source === "settings") return getSettingsPath();
+  return "Claude Code default";
+}
+
 function formatResetTime(iso: string | null | undefined): string {
   if (!iso) return "unknown";
   const d = new Date(iso);
@@ -449,6 +473,8 @@ async function handleClaudeCodeUsage(interaction: ChatInputCommandInteraction): 
     if (extra?.is_enabled && typeof extra.utilization === "number") {
       lines.push(`Extra usage: ${extra.utilization.toFixed(1)}% used of ${extra.monthly_limit ?? "—"} ${extra.currency ?? ""}`.trim());
     }
+    const model = getCurrentModel();
+    lines.push(`Model: ${model.model} (source: ${describeModelSource(model)})`);
     const effort = getCurrentEffort();
     lines.push(`Effort level: ${effort.level} (source: ${describeEffortSource(effort)})`);
     console.log(`[claude-code-usage] success: ${lines.length} lines`);
