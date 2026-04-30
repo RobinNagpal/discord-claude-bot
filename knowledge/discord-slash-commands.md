@@ -23,7 +23,7 @@ Currently defined commands (all implemented in `src/slash-commands.ts`):
 | `/list-worktrees`        | List git worktrees for the channel's project.                      |
 | `/delete-worktree`       | Remove a worktree and its branch (with a `name` string option).    |
 | `/claude-code-usage`     | Report Claude Code subscription usage for the current session and rolling week, plus the active default model and effort level. Runs in any channel/thread. |
-| `/claude-code-effort`    | Change the default Claude Code effort level (`low`/`medium`/`high`/`xhigh`/`max`/`auto`). `low`–`xhigh` write `~/.claude/settings.json`; `max` is rejected by that schema and is instead persisted to a bot-managed override file and applied via `--effort max` on each Claude Code spawn. |
+| `/claude-code-effort`    | Change the default Claude Code effort level (`low`/`medium`/`high`/`xhigh`/`max`/`auto`) by writing `~/.claude/settings.json`. `low`–`xhigh` go in the top-level `effortLevel` field. `max` is rejected by that schema, so it's persisted under `env.CLAUDE_CODE_EFFORT_LEVEL` instead — Claude Code injects that into the process env on launch. `max` is Opus-only. |
 | `/claude-code-model`     | Change the default Claude Code model (`opus`/`sonnet`/`haiku`/`default`) by writing `~/.claude/settings.json`. |
 | `/pull-bot-and-restart`  | Fetch latest `main` into the deployment repo, rebuild, and restart the systemd service. Gated by `ALLOWED_USERS`. |
 

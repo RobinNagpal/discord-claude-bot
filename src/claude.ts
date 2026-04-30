@@ -1,6 +1,5 @@
 import { execFile } from "child_process";
 import { CLAUDE_TIMEOUT, MAX_BUFFER } from "./config.js";
-import { readEffortOverride } from "./effort-override.js";
 
 export interface ClaudeOptions {
   cwd?: string;
@@ -59,11 +58,6 @@ export function runClaude(prompt: string, options: ClaudeOptions = {}): Promise<
   return new Promise((resolve, reject) => {
     const args = ["-p", "--dangerously-skip-permissions", "--output-format", "text"];
     if (options.continueSession) args.unshift("-c");
-    // Claude Code's settings.json schema rejects "max" effort, so the bot
-    // persists that choice in its own override file and applies it here via
-    // the CLI flag (which does accept "max").
-    const effortOverride = readEffortOverride();
-    if (effortOverride) args.push("--effort", effortOverride);
     args.push(prompt);
     const opts: { timeout: number; maxBuffer: number; cwd?: string } = {
       timeout: CLAUDE_TIMEOUT,

@@ -23,7 +23,6 @@ import {
 } from "./config.js";
 import { runClaude } from "./claude.js";
 import { formatError, formatClaudeError, formatExecError, splitMessage } from "./discord.js";
-import { clearEffortOverride, getEffortOverridePath, readEffortOverride, writeEffortOverride } from "./effort-override.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -50,7 +49,7 @@ const commands = [
           { name: "medium", value: "medium" },
           { name: "high", value: "high" },
           { name: "xhigh", value: "xhigh" },
-          { name: "max (CLI flag, applied per session)", value: "max" },
+          { name: "max (Opus-only, persisted via env)", value: "max" },
           { name: "auto (reset to model default)", value: "auto" },
         ),
     ),
@@ -314,14 +313,16 @@ interface ClaudeCredentials {
   };
 }
 
-// Claude Code's settings.json schema accepts only the "settings" levels below.
-// "max" is CLI-session-only — we persist it in a bot-managed override file and
-// apply it via the --effort flag in runClaude. "auto" is our sentinel for
-// clearing both the settings override and the bot override, letting Claude
-// fall back to the per-model default.
+// Claude Code's settings.json schema rejects "max" under top-level effortLevel
+// (low/medium/high/xhigh only). The documented way to persist max is via the
+// settings.json "env" field — claude-code injects those entries into the
+// process env on launch, and CLAUDE_CODE_EFFORT_LEVEL=max is honored there.
+// "auto" is our sentinel for clearing both fields and falling back to the
+// per-model default. See: https://x.com/MaxGhenis/status/2037181723331436723
 const SETTINGS_EFFORT_LEVELS = ["low", "medium", "high", "xhigh"] as const;
 const EFFORT_LEVELS = [...SETTINGS_EFFORT_LEVELS, "max", "auto"] as const;
 type SettingsEffortLevel = (typeof SETTINGS_EFFORT_LEVELS)[number];
+const EFFORT_ENV_KEY = "CLAUDE_CODE_EFFORT_LEVEL";
 
 // Claude Code stores the default model under the "model" key in settings.json.
 // Values are aliases (e.g. "opus", "sonnet", "haiku") or full model names like
@@ -333,7 +334,20 @@ type ModelChoice = Exclude<(typeof MODEL_CHOICES)[number], "default">;
 interface ClaudeSettings {
   effortLevel?: string;
   model?: string;
+  env?: Record<string, string>;
   [key: string]: unknown;
+}
+
+function readSettingsEnvEffort(settings: ClaudeSettings): string | null {
+  const value = settings.env?.[EFFORT_ENV_KEY];
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+
+function clearSettingsEnvEffort(settings: ClaudeSettings): void {
+  if (!settings.env) return;
+  const rest = Object.fromEntries(Object.entries(settings.env).filter(([k]) => k !== EFFORT_ENV_KEY));
+  if (Object.keys(rest).length === 0) delete settings.env;
+  else settings.env = rest;
 }
 
 function getSettingsPath(): string {
@@ -355,19 +369,20 @@ function readClaudeSettings(): { settings: ClaudeSettings; path: string; existed
 
 interface EffortStatus {
   level: string;
-  source: "env" | "bot-override" | "settings" | "default";
+  source: "env" | "settings.env" | "settings" | "default";
   envOverride: string | null;
 }
 
-// Precedence: CLAUDE_CODE_EFFORT_LEVEL env var > bot override file (max) >
-// settings.json > per-model default. The bot override file only ever holds
-// "max" — settings.json's schema rejects it.
+// Precedence: process env CLAUDE_CODE_EFFORT_LEVEL > settings.json env entry
+// (the persistence path for "max") > settings.json effortLevel > per-model
+// default. The settings.env entry only ever holds "max" — for other levels we
+// use the top-level effortLevel and clear settings.env to avoid shadowing.
 function getCurrentEffort(): EffortStatus {
-  const envLevel = process.env.CLAUDE_CODE_EFFORT_LEVEL?.trim();
+  const envLevel = process.env[EFFORT_ENV_KEY]?.trim();
   if (envLevel) return { level: envLevel, source: "env", envOverride: envLevel };
-  const botOverride = readEffortOverride();
-  if (botOverride) return { level: botOverride, source: "bot-override", envOverride: null };
   const { settings } = readClaudeSettings();
+  const settingsEnvLevel = readSettingsEnvEffort(settings);
+  if (settingsEnvLevel) return { level: settingsEnvLevel, source: "settings.env", envOverride: null };
   if (typeof settings.effortLevel === "string" && settings.effortLevel.trim() !== "") {
     return { level: settings.effortLevel, source: "settings", envOverride: null };
   }
@@ -375,8 +390,8 @@ function getCurrentEffort(): EffortStatus {
 }
 
 function describeEffortSource(status: EffortStatus): string {
-  if (status.source === "env") return "CLAUDE_CODE_EFFORT_LEVEL env var";
-  if (status.source === "bot-override") return getEffortOverridePath();
+  if (status.source === "env") return `${EFFORT_ENV_KEY} env var`;
+  if (status.source === "settings.env") return `${getSettingsPath()} (env.${EFFORT_ENV_KEY})`;
   if (status.source === "settings") return getSettingsPath();
   return "model default";
 }
@@ -509,44 +524,32 @@ async function handleClaudeCodeEffort(interaction: ChatInputCommandInteraction):
   try {
     const { settings, path } = readClaudeSettings();
     const previousSettings = typeof settings.effortLevel === "string" ? settings.effortLevel : null;
-    const previousOverride = readEffortOverride();
-    const previous = previousOverride ?? previousSettings ?? "(unset)";
+    const previousSettingsEnv = readSettingsEnvEffort(settings);
+    const previous = previousSettingsEnv ?? previousSettings ?? "(unset)";
 
-    const lines: string[] = [];
     if (level === "max") {
-      // settings.json rejects "max"; persist via bot override + CLI flag.
-      if (previousSettings !== null) {
-        delete settings.effortLevel;
-        writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf-8");
-        lines.push(`Removed \`effortLevel\` from \`${path}\` (Claude Code rejects \`max\` there).`);
-      }
-      const overridePath = writeEffortOverride("max");
-      lines.unshift(
-        `Claude Code effort level: \`${previous}\` -> \`max\``,
-        `Wrote \`${overridePath}\`.`,
-        "Applied via --effort flag on each Claude Code spawn.",
-      );
+      // settings.json's top-level effortLevel rejects "max"; persist via the
+      // env field, which Claude Code injects as CLAUDE_CODE_EFFORT_LEVEL on
+      // launch.
+      delete settings.effortLevel;
+      settings.env = { ...(settings.env ?? {}), [EFFORT_ENV_KEY]: "max" };
     } else if (level === "auto") {
-      if (previousSettings !== null) {
-        delete settings.effortLevel;
-        writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf-8");
-      }
-      if (previousOverride !== null) clearEffortOverride();
-      lines.push(
-        `Claude Code effort level: \`${previous}\` -> \`auto (model default)\``,
-        `Cleared \`${path}\` and bot override.`,
-        "Applies to new Claude Code sessions.",
-      );
+      delete settings.effortLevel;
+      clearSettingsEnvEffort(settings);
     } else {
       settings.effortLevel = level as SettingsEffortLevel;
-      writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf-8");
-      if (previousOverride !== null) clearEffortOverride();
-      lines.push(`Claude Code effort level: \`${previous}\` -> \`${level}\``, `Wrote \`${path}\`.`, "Applies to new Claude Code sessions.");
+      clearSettingsEnvEffort(settings);
     }
+    writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf-8");
 
-    const envOverride = process.env.CLAUDE_CODE_EFFORT_LEVEL?.trim();
+    const shown = level === "auto" ? "auto (model default)" : level;
+    const lines = [`Claude Code effort level: \`${previous}\` -> \`${shown}\``, `Wrote \`${path}\`.`, "Applies to new Claude Code sessions."];
+    if (level === "max") {
+      lines.push("Note: `max` is Opus-only — switch model to Opus if it's not already.");
+    }
+    const envOverride = process.env[EFFORT_ENV_KEY]?.trim();
     if (envOverride) {
-      lines.push(`Warning: CLAUDE_CODE_EFFORT_LEVEL=\`${envOverride}\` is set in the bot's environment and overrides everything else.`);
+      lines.push(`Warning: ${EFFORT_ENV_KEY}=\`${envOverride}\` is set in the bot's environment and overrides settings.json.`);
     }
     console.log(`[claude-code-effort] success: ${previous} -> ${level}`);
     await interaction.editReply(lines.join("\n"));
