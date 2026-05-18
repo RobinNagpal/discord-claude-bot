@@ -1,5 +1,5 @@
 import type { Message, ThreadChannel } from "discord.js";
-import { ClaudeRateLimitError } from "./claude.js";
+import { ClaudeCancelledError, ClaudeRateLimitError } from "./claude.js";
 
 const MAX_DISCORD_LENGTH = 1900;
 const DEFAULT_PREVIEW_LENGTH = 1500;
@@ -59,6 +59,9 @@ export function formatError(err: unknown): string {
 export function formatClaudeError(err: unknown, prefix: string): string {
   if (err instanceof ClaudeRateLimitError) {
     return `Claude Code usage limit reached. Please try again once the limit resets.\n\n${err.detail}`.slice(0, 1500);
+  }
+  if (err instanceof ClaudeCancelledError) {
+    return "Claude session was cancelled by the user.";
   }
   return `${prefix}: ${formatError(err)}`;
 }

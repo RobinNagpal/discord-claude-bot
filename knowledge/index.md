@@ -19,3 +19,4 @@ This folder collects durable, reference-style knowledge about the discord-claude
 
 ### Claude CLI integration
 - [claude-subprocess-errors.md](claude-subprocess-errors.md) — How `runClaude` invokes the Claude CLI, why stdin is closed immediately, how rate-limit errors are detected (`ClaudeRateLimitError`), and how `formatClaudeError` surfaces them to users.
+- [session-cancellation.md](session-cancellation.md) — How `!cancel` / `/cancel` kill in-flight Claude subprocesses via the per-channel session registry in `src/claude-sessions.ts`, including the sessionKey scheme for every spawn site.

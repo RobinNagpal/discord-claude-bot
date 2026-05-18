@@ -24,6 +24,9 @@ import { handleOutreachData } from "./handlers/outreach-data.js";
 import { handleGmail } from "./handlers/gmail.js";
 import { startJobScheduler } from "./jobs/jobs.js";
 import { registerSlashCommands, handleInteraction } from "./slash-commands.js";
+import { cancelSessionsAndReport } from "./cancel.js";
+
+const CANCEL_PREFIX = "!cancel";
 
 function isPidAlive(pid: number): boolean {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -93,6 +96,18 @@ client.on("interactionCreate", async (interaction: Interaction) => {
 
 client.on("messageCreate", async (message: Message) => {
   if (message.author.bot) return;
+
+  const trimmedContent = message.content.trim();
+  if (trimmedContent === CANCEL_PREFIX || trimmedContent.startsWith(`${CANCEL_PREFIX} `)) {
+    if (ALLOWED_CHANNELS && !ALLOWED_CHANNELS.includes(message.channelId)) return;
+    if (ALLOWED_USERS && !ALLOWED_USERS.includes(message.author.id)) {
+      await message.reply("You are not authorized to use this bot.");
+      return;
+    }
+    const outcome = cancelSessionsAndReport(message.channelId);
+    await message.reply(outcome.message);
+    return;
+  }
 
   const channel = message.channel;
   const isThread = channel.type === ChannelType.PublicThread || channel.type === ChannelType.PrivateThread;

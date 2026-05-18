@@ -154,9 +154,21 @@ function parseRouteDecision(raw: string): RouteDecision | null {
   }
 }
 
-async function routeRequest(config: WorktreeChannelConfig, userMessage: string): Promise<RouteDecision | { command: "router_error"; error: string }> {
+async function routeRequest(
+  config: WorktreeChannelConfig,
+  message: Message,
+  userMessage: string,
+): Promise<RouteDecision | { command: "router_error"; error: string }> {
   try {
-    await runClaude(buildRouterPrompt(config, userMessage), { cwd: config.mainRepo });
+    await runClaude(buildRouterPrompt(config, userMessage), {
+      cwd: config.mainRepo,
+      sessionKey: message.channelId,
+      sessionMeta: {
+        userId: message.author.id,
+        description: `${config.startTaskLabel} router`,
+        promptPreview: truncateForPreview(userMessage, 80),
+      },
+    });
   } catch (err) {
     return { command: "router_error", error: formatClaudeError(err, "Routing failed") };
   }
@@ -368,7 +380,15 @@ async function handleMaintenance(config: WorktreeChannelConfig, message: Message
   clearResultFiles(config);
   await message.reply(`Running maintenance task...\n**Task:** ${truncateForPreview(taskDescription)}`);
   try {
-    await runClaude(buildMaintenancePrompt(config, taskDescription), { cwd: config.mainRepo });
+    await runClaude(buildMaintenancePrompt(config, taskDescription), {
+      cwd: config.mainRepo,
+      sessionKey: message.channelId,
+      sessionMeta: {
+        userId: message.author.id,
+        description: `${config.startTaskLabel} maintenance`,
+        promptPreview: truncateForPreview(taskDescription, 80),
+      },
+    });
   } catch (err) {
     const errText = formatClaudeError(err, "Maintenance failed");
     appendChannelExchange(config, "claude", "ClaudeCode", errText);
@@ -385,7 +405,15 @@ async function handleNewTask(config: WorktreeChannelConfig, message: Message, ta
   await message.reply(`Starting new ${config.startTaskLabel} task...\n**Task:** ${truncateForPreview(taskDescription)}\n\n**Step 1/2:** Managing worktrees...`);
 
   try {
-    await runClaude(buildWorktreeManagementPrompt(config, taskDescription), { cwd: config.mainRepo });
+    await runClaude(buildWorktreeManagementPrompt(config, taskDescription), {
+      cwd: config.mainRepo,
+      sessionKey: message.channelId,
+      sessionMeta: {
+        userId: message.author.id,
+        description: `${config.startTaskLabel} worktree setup`,
+        promptPreview: truncateForPreview(taskDescription, 80),
+      },
+    });
   } catch (err) {
     const errText = formatClaudeError(err, "Step 1 failed");
     appendChannelExchange(config, "claude", "ClaudeCode", errText);
@@ -430,7 +458,15 @@ async function handleNewTask(config: WorktreeChannelConfig, message: Message, ta
   appendChannelExchange(config, "claude", "ClaudeCode", `Created thread \`${threadName}\` for branch \`${branchName}\``);
 
   try {
-    await runClaude(buildInitialTaskPrompt(config, taskDescription, worktreePath, branchName), { cwd: worktreePath });
+    await runClaude(buildInitialTaskPrompt(config, taskDescription, worktreePath, branchName), {
+      cwd: worktreePath,
+      sessionKey: thread.id,
+      sessionMeta: {
+        userId: message.author.id,
+        description: `${config.startTaskLabel} initial task (${branchName})`,
+        promptPreview: truncateForPreview(taskDescription, 80),
+      },
+    });
   } catch (err) {
     const errText = formatClaudeError(err, "Step 2 failed");
     appendThreadExchange(config, branchName, "claude", "ClaudeCode", errText);
@@ -448,7 +484,7 @@ export async function handleWorktreeChannelMessage(config: WorktreeChannelConfig
   clearResultFiles(config);
 
   await message.reply("Routing your request...");
-  const decision = await routeRequest(config, userMessage);
+  const decision = await routeRequest(config, message, userMessage);
 
   if (decision.command === "router_error") {
     const errText = decision.error;

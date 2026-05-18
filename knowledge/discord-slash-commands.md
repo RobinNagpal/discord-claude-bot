@@ -26,6 +26,7 @@ Currently defined commands (all implemented in `src/slash-commands.ts`):
 | `/claude-code-effort`    | Change the default Claude Code effort level (`low`/`medium`/`high`/`xhigh`/`auto`) by writing `~/.claude/settings.json`. `max` is session-only in Claude Code and not offered here. |
 | `/claude-code-model`     | Change the default Claude Code model (`opus`/`sonnet`/`haiku`/`default`) by writing `~/.claude/settings.json`. |
 | `/pull-bot-and-restart`  | Fetch latest `main` into the deployment repo, rebuild, and restart the systemd service. Gated by `ALLOWED_USERS`. |
+| `/cancel`                | Kill any in-flight Claude session(s) running for the current channel or thread. The `!cancel` message has the same effect. |
 
 ## Registration lifecycle
 

@@ -22,6 +22,7 @@ import {
   DISCORD_BOT_WORKTREE_BASE,
 } from "./config.js";
 import { runClaude } from "./claude.js";
+import { cancelSessionsAndReport } from "./cancel.js";
 import { formatError, formatClaudeError, formatExecError, splitMessage } from "./discord.js";
 
 const execFileAsync = promisify(execFile);
@@ -68,6 +69,7 @@ const commands = [
         ),
     ),
   new SlashCommandBuilder().setName("pull-bot-and-restart").setDescription("Pull the latest bot code from main, rebuild, and restart the systemd service."),
+  new SlashCommandBuilder().setName("cancel").setDescription("Cancel any in-flight Claude session running for this channel or thread."),
 ];
 
 export async function registerSlashCommands(): Promise<void> {
@@ -161,7 +163,16 @@ async function handleCompact(interaction: ChatInputCommandInteraction): Promise<
 
   await interaction.deferReply();
   try {
-    const out = await runClaude("/compact", { cwd: worktreePath, continueSession: true });
+    const out = await runClaude("/compact", {
+      cwd: worktreePath,
+      continueSession: true,
+      sessionKey: channel.id,
+      sessionMeta: {
+        userId: interaction.user.id,
+        description: `/compact (${channel.name})`,
+        promptPreview: "/compact",
+      },
+    });
     const cleaned = out.trim();
     let msg = `Compacted session for \`${channel.name}\`.`;
     if (cleaned && cleaned !== "(no output)") msg += `\n\`\`\`\n${cleaned}\n\`\`\``;
@@ -612,6 +623,24 @@ async function handlePullBotAndRestart(interaction: ChatInputCommandInteraction)
   child.unref();
 }
 
+async function handleCancel(interaction: ChatInputCommandInteraction): Promise<void> {
+  const channelId = interaction.channelId;
+  if (!channelId) {
+    await interaction.reply({ content: "Cannot determine channel for cancellation.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  if (ALLOWED_USERS && !ALLOWED_USERS.includes(interaction.user.id)) {
+    await interaction.reply({ content: "You are not authorized to use this bot.", flags: MessageFlags.Ephemeral });
+    return;
+  }
+  const outcome = cancelSessionsAndReport(channelId);
+  if (outcome.cancelled.length === 0) {
+    await interaction.reply({ content: outcome.message, flags: MessageFlags.Ephemeral });
+    return;
+  }
+  await interaction.reply(outcome.message);
+}
+
 export async function handleInteraction(interaction: ChatInputCommandInteraction): Promise<void> {
   if (interaction.commandName === "compact") await handleCompact(interaction);
   else if (interaction.commandName === "list-worktrees") await handleListWorktrees(interaction);
@@ -620,4 +649,5 @@ export async function handleInteraction(interaction: ChatInputCommandInteraction
   else if (interaction.commandName === "claude-code-effort") await handleClaudeCodeEffort(interaction);
   else if (interaction.commandName === "claude-code-model") await handleClaudeCodeModel(interaction);
   else if (interaction.commandName === "pull-bot-and-restart") await handlePullBotAndRestart(interaction);
+  else if (interaction.commandName === "cancel") await handleCancel(interaction);
 }

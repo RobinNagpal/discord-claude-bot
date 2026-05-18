@@ -1,9 +1,18 @@
 import { execFile } from "child_process";
 import { CLAUDE_TIMEOUT, MAX_BUFFER } from "./config.js";
+import { registerSession, unregisterSession, type ActiveClaudeSession } from "./claude-sessions.js";
+
+export interface ClaudeSessionMeta {
+  userId: string;
+  description: string;
+  promptPreview: string;
+}
 
 export interface ClaudeOptions {
   cwd?: string;
   continueSession?: boolean;
+  sessionKey?: string;
+  sessionMeta?: ClaudeSessionMeta;
 }
 
 export class ClaudeRateLimitError extends Error {
@@ -13,6 +22,13 @@ export class ClaudeRateLimitError extends Error {
   ) {
     super(message);
     this.name = "ClaudeRateLimitError";
+  }
+}
+
+export class ClaudeCancelledError extends Error {
+  constructor(public readonly session: ActiveClaudeSession | null) {
+    super("Claude session was cancelled.");
+    this.name = "ClaudeCancelledError";
   }
 }
 
@@ -65,7 +81,14 @@ export function runClaude(prompt: string, options: ClaudeOptions = {}): Promise<
     };
     if (options.cwd) opts.cwd = options.cwd;
 
+    let registered: ActiveClaudeSession | null = null;
+
     const child = execFile("claude", args, opts, (error, stdout, stderr) => {
+      if (registered) unregisterSession(registered);
+      if (registered?.cancelled) {
+        reject(new ClaudeCancelledError(registered));
+        return;
+      }
       if (error) {
         const detail = extractRateLimitDetail(stdout, stderr);
         if (detail !== null) {
@@ -86,6 +109,16 @@ export function runClaude(prompt: string, options: ClaudeOptions = {}): Promise<
       }
       resolve(stdout.trim() || "(no output)");
     });
+
+    if (options.sessionKey) {
+      registered = registerSession({
+        sessionKey: options.sessionKey,
+        child,
+        userId: options.sessionMeta?.userId ?? "unknown",
+        description: options.sessionMeta?.description ?? "Claude session",
+        promptPreview: options.sessionMeta?.promptPreview ?? "",
+      });
+    }
 
     // Close stdin immediately: we only use the -p prompt arg, so Claude should
     // not wait for input. Without this, the CLI emits a "no stdin data

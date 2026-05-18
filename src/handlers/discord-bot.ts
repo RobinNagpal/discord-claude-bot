@@ -12,7 +12,7 @@ import {
   DISCORD_BOT_THREAD_LOGS_DIR,
 } from "../config.js";
 import { runClaude } from "../claude.js";
-import { replyInChunks, formatClaudeError } from "../discord.js";
+import { replyInChunks, formatClaudeError, truncateForPreview } from "../discord.js";
 import { readResultFile } from "../result.js";
 import { type WorktreeChannelConfig, appendThreadExchange, clearResultFiles, handleWorktreeChannelMessage } from "./worktree-channel.js";
 
@@ -87,7 +87,16 @@ export async function handleDiscordBotThread(message: Message, thread: ThreadCha
   await message.reply("Continuing session...");
 
   try {
-    await runClaude(buildFollowupPrompt(userMessage, worktreePath, worktreeName), { cwd: worktreePath, continueSession: true });
+    await runClaude(buildFollowupPrompt(userMessage, worktreePath, worktreeName), {
+      cwd: worktreePath,
+      continueSession: true,
+      sessionKey: thread.id,
+      sessionMeta: {
+        userId: message.author.id,
+        description: `discord-bot follow-up (${worktreeName})`,
+        promptPreview: truncateForPreview(userMessage, 80),
+      },
+    });
   } catch (err) {
     const errText = formatClaudeError(err, "Follow-up failed");
     appendThreadExchange(CONFIG, worktreeName, "claude", "ClaudeCode", errText);

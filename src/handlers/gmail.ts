@@ -61,7 +61,15 @@ export async function handleGmail(message: Message, taskDescription: string): Pr
   const prompt = buildGmailPrompt(taskDescription, workflowContext);
 
   try {
-    await runClaude(prompt, { cwd: GMAIL_WORKSPACE });
+    await runClaude(prompt, {
+      cwd: GMAIL_WORKSPACE,
+      sessionKey: message.channelId,
+      sessionMeta: {
+        userId: message.author.id,
+        description: "gmail",
+        promptPreview: truncateForPreview(taskDescription, 80),
+      },
+    });
   } catch (err) {
     await message.reply(formatClaudeError(err, "Task failed"));
     return;

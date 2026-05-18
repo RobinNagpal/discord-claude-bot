@@ -61,7 +61,15 @@ export async function handleOutreachData(message: Message, taskDescription: stri
   const prompt = buildOutreachPrompt(taskDescription, campaignContext);
 
   try {
-    await runClaude(prompt, { cwd: OUTREACH_DATA_WORKSPACE });
+    await runClaude(prompt, {
+      cwd: OUTREACH_DATA_WORKSPACE,
+      sessionKey: message.channelId,
+      sessionMeta: {
+        userId: message.author.id,
+        description: "outreach-data",
+        promptPreview: truncateForPreview(taskDescription, 80),
+      },
+    });
   } catch (err) {
     await message.reply(formatClaudeError(err, "Task failed"));
     return;
