@@ -73,6 +73,22 @@ export const DISCORD_BOT_ROUTE_RESULT = "/tmp/claude-code-route-discord-bot.json
 export const DISCORD_BOT_EXCHANGE_LOG = "/home/ubuntu/discord-claude-bot/discord-bot/discord-message-exchange.md";
 export const DISCORD_BOT_THREAD_LOGS_DIR = "/home/ubuntu/discord-claude-bot/discord-bot/discord-thread-logs";
 
+// --- Place-Items-On-Shelf ---
+export const PLACE_ITEMS_ON_SHELF_CHANNEL: string = optionalEnv("PLACE_ITEMS_ON_SHELF_CHANNEL", "1508534205871816804");
+export const PLACE_ITEMS_ON_SHELF_MAIN_REPO: string = optionalEnv(
+  "PLACE_ITEMS_ON_SHELF_MAIN_REPO",
+  "/home/ubuntu/discord-claude-bot/place-items-on-shelf/place-items-on-shelf",
+);
+export const PLACE_ITEMS_ON_SHELF_WORKTREE_BASE: string = optionalEnv(
+  "PLACE_ITEMS_ON_SHELF_WORKTREE_BASE",
+  "/home/ubuntu/discord-claude-bot/place-items-on-shelf/worktrees",
+);
+export const PLACE_ITEMS_ON_SHELF_WORKTREE_RESULT = "/tmp/claude-code-worktree-place-items-on-shelf.md";
+export const PLACE_ITEMS_ON_SHELF_TASK_RESULT = "/tmp/claude-code-result-place-items-on-shelf.md";
+export const PLACE_ITEMS_ON_SHELF_ROUTE_RESULT = "/tmp/claude-code-route-place-items-on-shelf.json";
+export const PLACE_ITEMS_ON_SHELF_EXCHANGE_LOG = "/home/ubuntu/discord-claude-bot/place-items-on-shelf/discord-message-exchange.md";
+export const PLACE_ITEMS_ON_SHELF_THREAD_LOGS_DIR = "/home/ubuntu/discord-claude-bot/place-items-on-shelf/discord-thread-logs";
+
 // --- Outreach-Data ---
 export const OUTREACH_DATA_CHANNEL: string = optionalEnv("OUTREACH_DATA_CHANNEL", "1491111325173022933");
 export const OUTREACH_DATA_WORKSPACE: string = optionalEnv("OUTREACH_DATA_WORKSPACE", "/home/ubuntu/.openclaw/workspace-outreach-data");
