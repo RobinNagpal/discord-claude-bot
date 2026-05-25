@@ -551,6 +551,20 @@ async function handleClaudeCodeModel(interaction: ChatInputCommandInteraction): 
   }
 }
 
+async function findUntrackedPullConflicts(repo: string): Promise<string[]> {
+  let addedPaths: string[];
+  try {
+    const diff = await runGit(repo, ["diff", "--name-only", "--diff-filter=A", "HEAD..FETCH_HEAD"]);
+    addedPaths = diff.stdout
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+  return addedPaths.filter((rel) => existsSync(join(repo, rel)));
+}
+
 async function handlePullBotAndRestart(interaction: ChatInputCommandInteraction): Promise<void> {
   if (ALLOWED_USERS && !ALLOWED_USERS.includes(interaction.user.id)) {
     await interaction.reply({ content: "You are not authorized to restart the bot.", flags: MessageFlags.Ephemeral });
@@ -569,6 +583,15 @@ async function handlePullBotAndRestart(interaction: ChatInputCommandInteraction)
     lines.push(`$ git fetch origin main\n${fetchOut || "(up to date)"}`);
   } catch (err) {
     await interaction.editReply(`fetch failed:\n${formatExecError(err)}`);
+    return;
+  }
+
+  const untrackedConflicts = await findUntrackedPullConflicts(repo);
+  if (untrackedConflicts.length > 0) {
+    const list = untrackedConflicts.map((p) => `  ${p}`).join("\n");
+    await interaction.editReply(
+      `pull aborted — these untracked files in the deployment repo would be overwritten by the incoming merge:\n\`\`\`\n${list}\n\`\`\`\nResolve on the bot host with \`rm\` or \`mv\` (or commit them), then re-run \`/pull-bot-and-restart\`.`,
+    );
     return;
   }
 
