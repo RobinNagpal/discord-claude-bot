@@ -30,6 +30,7 @@ src/
 │   ├── insights-ui.ts              # Two-step worktree workflow handler
 │   ├── scraping-lambdas.ts         # Thread+worktree workflow for scraping-lambdas monorepo
 │   ├── discord-bot.ts              # Thread+worktree workflow for the bot's own codebase
+│   ├── place-items-on-shelf.ts     # Thread+worktree workflow for the place-items-on-shelf repo
 │   └── outreach-data.ts            # Campaign auto-detection + outreach handler
 └── jobs/
     ├── types.ts                    # JobConfig, JobSchedule, JobHandler, JobRunResult
@@ -58,6 +59,9 @@ Other directories:
 - `discord-bot/discord-claude-bot/` — Cloned `RobinNagpal/discord-claude-bot` repo (main repo for self-update worktree workflow)
 - `discord-bot/worktrees/` — Git worktrees created/managed by the discord-bot handler
 - `discord-bot/CLAUDE.md` — Context docs for the discord-bot (self-update) agent workflow
+- `place-items-on-shelf/place-items-on-shelf/` — Cloned `RobinNagpal/place-items-on-shelf` repo (main repo for that worktree workflow)
+- `place-items-on-shelf/worktrees/` — Git worktrees created/managed by the place-items-on-shelf handler
+- `place-items-on-shelf/CLAUDE.md` — Context docs for the place-items-on-shelf agent workflow
 - `gmail/CLAUDE.md` — Context docs for the Gmail (ambassador email workflows) agent
 - `outreach-data/CLAUDE.md` — Context docs for the outreach-data agent workflow
 - `.env` / `.env.example` — Configuration (bot token, channel IDs, workspace paths)
@@ -82,6 +86,7 @@ The bot routes `!claude <prompt>` messages based on Discord channel ID:
 - **Insights-UI channel** (`INSIGHTS_UI_CHANNEL`) -> `handleInsightsUI()` — Two-step git worktree workflow. Step 1 manages worktrees in the main repo, Step 2 runs the task in the selected worktree.
 - **Scraping-Lambdas channel** (`SCRAPING_LAMBDAS_CHANNEL`) -> `handleScrapingLambdas()` — Same thread+worktree workflow as insights-ui, pointed at the `scraping-lambdas` monorepo. Per-subproject quality checks (`yarn compile && yarn prettier-check`).
 - **Discord-Bot channel** (`DISCORD_BOT_CHANNEL`) -> `handleDiscordBot()` — Same thread+worktree workflow, pointed at the bot's own codebase. Quality checks: `npm run typecheck && npm run lint && npm run prettier`.
+- **Place-Items-On-Shelf channel** (`PLACE_ITEMS_ON_SHELF_CHANNEL`) -> `handlePlaceItemsOnShelf()` — Same thread+worktree workflow, pointed at the `place-items-on-shelf` repo.
 - **Outreach-Data channel** (`OUTREACH_DATA_CHANNEL`) -> `handleOutreachData()` — Spawns Claude Code in the outreach-data workspace with campaign context auto-detected from keywords.
 - **Gmail channel** (`GMAIL_CHANNEL`) -> `handleGmail()` — Ambassador email workflows: process threads, export to CSV, send follow-ups. Auto-detects workflow from keywords.
 - **All other channels** -> `handleGeneral()` — Simple pass-through to `claude -p`.
