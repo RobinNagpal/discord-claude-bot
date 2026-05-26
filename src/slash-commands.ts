@@ -20,6 +20,9 @@ import {
   DISCORD_BOT_CHANNEL,
   DISCORD_BOT_MAIN_REPO,
   DISCORD_BOT_WORKTREE_BASE,
+  PLACE_ITEMS_ON_SHELF_CHANNEL,
+  PLACE_ITEMS_ON_SHELF_MAIN_REPO,
+  PLACE_ITEMS_ON_SHELF_WORKTREE_BASE,
 } from "./config.js";
 import { runClaude } from "./claude.js";
 import { formatError, formatClaudeError, formatExecError, splitMessage } from "./discord.js";
@@ -91,6 +94,7 @@ function resolveWorktreePath(parentId: string | null, threadName: string): strin
   if (parentId === INSIGHTS_UI_CHANNEL) return join(INSIGHTS_UI_WORKTREE_BASE, threadName);
   if (parentId === SCRAPING_LAMBDAS_CHANNEL) return join(SCRAPING_LAMBDAS_WORKTREE_BASE, threadName);
   if (parentId === DISCORD_BOT_CHANNEL) return join(DISCORD_BOT_WORKTREE_BASE, threadName);
+  if (parentId === PLACE_ITEMS_ON_SHELF_CHANNEL) return join(PLACE_ITEMS_ON_SHELF_WORKTREE_BASE, threadName);
   return null;
 }
 
@@ -113,6 +117,9 @@ function resolveProjectContext(interaction: ChatInputCommandInteraction): Projec
   }
   if (projectChannelId === DISCORD_BOT_CHANNEL) {
     return { mainRepo: DISCORD_BOT_MAIN_REPO, worktreeBase: DISCORD_BOT_WORKTREE_BASE, projectName: "discord-bot" };
+  }
+  if (projectChannelId === PLACE_ITEMS_ON_SHELF_CHANNEL) {
+    return { mainRepo: PLACE_ITEMS_ON_SHELF_MAIN_REPO, worktreeBase: PLACE_ITEMS_ON_SHELF_WORKTREE_BASE, projectName: "place-items-on-shelf" };
   }
   return null;
 }
@@ -149,7 +156,7 @@ async function handleCompact(interaction: ChatInputCommandInteraction): Promise<
   const worktreePath = resolveWorktreePath(channel.parentId, channel.name);
   if (!worktreePath) {
     await interaction.reply({
-      content: "This thread is not a worktree thread (parent channel is not insights-ui, scraping-lambdas, or discord-bot).",
+      content: "This thread is not a worktree thread (parent channel is not insights-ui, scraping-lambdas, discord-bot, or place-items-on-shelf).",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -175,7 +182,7 @@ async function handleListWorktrees(interaction: ChatInputCommandInteraction): Pr
   const ctx = resolveProjectContext(interaction);
   if (!ctx) {
     await interaction.reply({
-      content: "`/list-worktrees` must be run in a project channel or its thread (insights-ui, scraping-lambdas, discord-bot).",
+      content: "`/list-worktrees` must be run in a project channel or its thread (insights-ui, scraping-lambdas, discord-bot, place-items-on-shelf).",
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -248,7 +255,7 @@ async function handleDeleteWorktree(interaction: ChatInputCommandInteraction): P
   const ctx = resolveProjectContext(interaction);
   if (!ctx) {
     await interaction.reply({
-      content: "`/delete-worktree` must be run in a project channel or its thread (insights-ui, scraping-lambdas, discord-bot).",
+      content: "`/delete-worktree` must be run in a project channel or its thread (insights-ui, scraping-lambdas, discord-bot, place-items-on-shelf).",
       flags: MessageFlags.Ephemeral,
     });
     return;
