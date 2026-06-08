@@ -1,4 +1,5 @@
 import { execFile } from "child_process";
+import { existsSync, statSync } from "node:fs";
 import { CLAUDE_TIMEOUT, MAX_BUFFER } from "./config.js";
 
 export interface ClaudeOptions {
@@ -56,6 +57,14 @@ function extractRateLimitDetail(stdout: string, stderr: string): string | null {
 
 export function runClaude(prompt: string, options: ClaudeOptions = {}): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Pre-flight check: if cwd is set but doesn't exist (or isn't a dir), Node
+    // surfaces it as a misleading `spawn claude ENOENT` — same error code as a
+    // missing binary, with no hint about the missing directory. Catch it here
+    // so the operator sees the actual problem.
+    if (options.cwd && (!existsSync(options.cwd) || !statSync(options.cwd).isDirectory())) {
+      reject(new Error(`cwd does not exist or is not a directory: ${options.cwd}`));
+      return;
+    }
     const args = ["-p", "--dangerously-skip-permissions", "--output-format", "text"];
     if (options.continueSession) args.unshift("-c");
     args.push(prompt);
