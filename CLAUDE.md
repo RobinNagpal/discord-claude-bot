@@ -31,6 +31,7 @@ src/
 │   ├── scraping-lambdas.ts         # Thread+worktree workflow for scraping-lambdas monorepo
 │   ├── discord-bot.ts              # Thread+worktree workflow for the bot's own codebase
 │   ├── place-items-on-shelf.ts     # Thread+worktree workflow for the place-items-on-shelf repo
+│   ├── academy-ui.ts               # Thread+worktree workflow for the academy-ui sub-app of dodao-ui
 │   └── outreach-data.ts            # Campaign auto-detection + outreach handler
 └── jobs/
     ├── types.ts                    # JobConfig, JobSchedule, JobHandler, JobRunResult
@@ -62,6 +63,9 @@ Other directories:
 - `place-items-on-shelf/place-items-on-shelf/` — Cloned `RobinNagpal/place-items-on-shelf` repo (main repo for that worktree workflow)
 - `place-items-on-shelf/worktrees/` — Git worktrees created/managed by the place-items-on-shelf handler
 - `place-items-on-shelf/CLAUDE.md` — Context docs for the place-items-on-shelf agent workflow
+- `academy-ui/dodao-ui/` — Cloned `RobinNagpal/dodao-ui` repo (main repo for the academy-ui worktree workflow)
+- `academy-ui/worktrees/` — Git worktrees created/managed by the academy-ui handler
+- `academy-ui/CLAUDE.md` — Context docs for the academy-ui agent workflow
 - `gmail/CLAUDE.md` — Context docs for the Gmail (ambassador email workflows) agent
 - `outreach-data/CLAUDE.md` — Context docs for the outreach-data agent workflow
 - `.env` / `.env.example` — Configuration (bot token, channel IDs, workspace paths)
@@ -87,6 +91,7 @@ The bot routes `!claude <prompt>` messages based on Discord channel ID:
 - **Scraping-Lambdas channel** (`SCRAPING_LAMBDAS_CHANNEL`) -> `handleScrapingLambdas()` — Same thread+worktree workflow as insights-ui, pointed at the `scraping-lambdas` monorepo. Per-subproject quality checks (`yarn compile && yarn prettier-check`).
 - **Discord-Bot channel** (`DISCORD_BOT_CHANNEL`) -> `handleDiscordBot()` — Same thread+worktree workflow, pointed at the bot's own codebase. Quality checks: `npm run typecheck && npm run lint && npm run prettier`.
 - **Place-Items-On-Shelf channel** (`PLACE_ITEMS_ON_SHELF_CHANNEL`) -> `handlePlaceItemsOnShelf()` — Same thread+worktree workflow, pointed at the `place-items-on-shelf` repo.
+- **Academy-UI channel** (`ACADEMY_UI_CHANNEL`) -> `handleAcademyUI()` — Same thread+worktree workflow, pointed at the `academy-ui` sub-app of the `dodao-ui` monorepo. Quality checks: `yarn lint && yarn prettier-check && yarn build`.
 - **Outreach-Data channel** (`OUTREACH_DATA_CHANNEL`) -> `handleOutreachData()` — Spawns Claude Code in the outreach-data workspace with campaign context auto-detected from keywords.
 - **Gmail channel** (`GMAIL_CHANNEL`) -> `handleGmail()` — Ambassador email workflows: process threads, export to CSV, send follow-ups. Auto-detects workflow from keywords.
 - **All other channels** -> `handleGeneral()` — Simple pass-through to `claude -p`.

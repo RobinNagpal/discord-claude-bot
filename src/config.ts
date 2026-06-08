@@ -73,6 +73,16 @@ export const DISCORD_BOT_ROUTE_RESULT = "/tmp/claude-code-route-discord-bot.json
 export const DISCORD_BOT_EXCHANGE_LOG = "/home/ubuntu/discord-claude-bot/discord-bot/discord-message-exchange.md";
 export const DISCORD_BOT_THREAD_LOGS_DIR = "/home/ubuntu/discord-claude-bot/discord-bot/discord-thread-logs";
 
+// --- Academy-UI ---
+export const ACADEMY_UI_CHANNEL: string = optionalEnv("ACADEMY_UI_CHANNEL", "1513512838759583834");
+export const ACADEMY_UI_MAIN_REPO: string = optionalEnv("ACADEMY_UI_MAIN_REPO", "/home/ubuntu/discord-claude-bot/academy-ui/dodao-ui");
+export const ACADEMY_UI_WORKTREE_BASE: string = optionalEnv("ACADEMY_UI_WORKTREE_BASE", "/home/ubuntu/discord-claude-bot/academy-ui/worktrees");
+export const ACADEMY_UI_WORKTREE_RESULT = "/tmp/claude-code-worktree-academy-ui.md";
+export const ACADEMY_UI_TASK_RESULT = "/tmp/claude-code-result-academy-ui.md";
+export const ACADEMY_UI_ROUTE_RESULT = "/tmp/claude-code-route-academy-ui.json";
+export const ACADEMY_UI_EXCHANGE_LOG = "/home/ubuntu/discord-claude-bot/academy-ui/discord-message-exchange.md";
+export const ACADEMY_UI_THREAD_LOGS_DIR = "/home/ubuntu/discord-claude-bot/academy-ui/discord-thread-logs";
+
 // --- Place-Items-On-Shelf ---
 export const PLACE_ITEMS_ON_SHELF_CHANNEL: string = optionalEnv("PLACE_ITEMS_ON_SHELF_CHANNEL", "1508534205871816804");
 export const PLACE_ITEMS_ON_SHELF_MAIN_REPO: string = optionalEnv(
