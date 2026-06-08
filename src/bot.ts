@@ -10,6 +10,7 @@ import {
   SCRAPING_LAMBDAS_CHANNEL,
   DISCORD_BOT_CHANNEL,
   PLACE_ITEMS_ON_SHELF_CHANNEL,
+  ACADEMY_UI_CHANNEL,
   OUTREACH_DATA_CHANNEL,
   GMAIL_CHANNEL,
   LOCK_FILE,
@@ -22,6 +23,7 @@ import { handleInsightsUI, handleInsightsUIThread } from "./handlers/insights-ui
 import { handleScrapingLambdas, handleScrapingLambdasThread } from "./handlers/scraping-lambdas.js";
 import { handleDiscordBot, handleDiscordBotThread } from "./handlers/discord-bot.js";
 import { handlePlaceItemsOnShelf, handlePlaceItemsOnShelfThread } from "./handlers/place-items-on-shelf.js";
+import { handleAcademyUI, handleAcademyUIThread } from "./handlers/academy-ui.js";
 import { handleOutreachData } from "./handlers/outreach-data.js";
 import { handleGmail } from "./handlers/gmail.js";
 import { startJobScheduler } from "./jobs/jobs.js";
@@ -102,7 +104,8 @@ client.on("messageCreate", async (message: Message) => {
   const inScrapingLambdasThread = isThread && channel.parentId === SCRAPING_LAMBDAS_CHANNEL;
   const inDiscordBotThread = isThread && channel.parentId === DISCORD_BOT_CHANNEL;
   const inPlaceItemsOnShelfThread = isThread && channel.parentId === PLACE_ITEMS_ON_SHELF_CHANNEL;
-  const inWorktreeThread = inInsightsUiThread || inScrapingLambdasThread || inDiscordBotThread || inPlaceItemsOnShelfThread;
+  const inAcademyUiThread = isThread && channel.parentId === ACADEMY_UI_CHANNEL;
+  const inWorktreeThread = inInsightsUiThread || inScrapingLambdasThread || inDiscordBotThread || inPlaceItemsOnShelfThread || inAcademyUiThread;
 
   const audioAttachments = inWorktreeThread ? getAudioAttachments(message) : [];
   const hasAudio = audioAttachments.length > 0;
@@ -184,6 +187,8 @@ client.on("messageCreate", async (message: Message) => {
       await handleDiscordBotThread(message, channel as ThreadChannel, prompt);
     } else if (inPlaceItemsOnShelfThread) {
       await handlePlaceItemsOnShelfThread(message, channel as ThreadChannel, prompt);
+    } else if (inAcademyUiThread) {
+      await handleAcademyUIThread(message, channel as ThreadChannel, prompt);
     } else if (message.channelId === INSIGHTS_UI_CHANNEL) {
       await handleInsightsUI(message, prompt);
     } else if (message.channelId === SCRAPING_LAMBDAS_CHANNEL) {
@@ -192,6 +197,8 @@ client.on("messageCreate", async (message: Message) => {
       await handleDiscordBot(message, prompt);
     } else if (message.channelId === PLACE_ITEMS_ON_SHELF_CHANNEL) {
       await handlePlaceItemsOnShelf(message, prompt);
+    } else if (message.channelId === ACADEMY_UI_CHANNEL) {
+      await handleAcademyUI(message, prompt);
     } else if (message.channelId === OUTREACH_DATA_CHANNEL) {
       await handleOutreachData(message, prompt);
     } else if (message.channelId === GMAIL_CHANNEL) {
