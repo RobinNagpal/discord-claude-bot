@@ -19,3 +19,4 @@ This folder collects durable, reference-style knowledge about the discord-claude
 
 ### Claude CLI integration
 - [claude-subprocess-errors.md](claude-subprocess-errors.md) — How `runClaude` invokes the Claude CLI, why stdin is closed immediately, how rate-limit errors are detected (`ClaudeRateLimitError`), and how `formatClaudeError` surfaces them to users.
+- [claude-code-settings.md](claude-code-settings.md) — Reference for Claude Code `settings.json`: the file hierarchy (managed → local → project → user) and precedence rules, the keys the bot actually uses (`model`, `effortLevel`, `permissions`), the `permissions` object, environment variables, and hooks.
